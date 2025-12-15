@@ -83,7 +83,7 @@ stockelper-workspace/
 ### 1. 이 워크스페이스 Clone
 
 ```bash
-git clone https://github.com/YOUR_ORG/stockelper-workspace.git
+git clone https://github.com/Stockelper-Lab/stockelper-workspace.git
 cd stockelper-workspace
 ```
 
@@ -93,13 +93,13 @@ cd stockelper-workspace
 cd ..
 
 # Public 레포들
-git clone https://github.com/YOUR_ORG/stockelper-airflow.git
-git clone https://github.com/YOUR_ORG/stockelper-fe.git
-git clone https://github.com/YOUR_ORG/stockelper-kg.git
-git clone https://github.com/YOUR_ORG/stockelper-llm.git
+git clone https://github.com/Stockelper-Lab/stockelper-airflow.git
+git clone https://github.com/Stockelper-Lab/stockelper-fe.git
+git clone https://github.com/Stockelper-Lab/stockelper-kg.git
+git clone https://github.com/Stockelper-Lab/stockelper-llm.git
 
 # Private 레포 (권한 필요)
-git clone git@github.com:YOUR_ORG/stockelper-news-crawler.git
+git clone git@github.com:Stockelper-Lab/stockelper-news-crawler.git
 ```
 
 ### 3. Sources 심볼릭 링크 설정
@@ -178,10 +178,10 @@ cp .bmad/templates/story.md docs/epics/STORY-001-task.md
 
 ## 🔗 관련 링크
 
-- [stockelper-airflow](https://github.com/YOUR_ORG/stockelper-airflow) - Airflow DAG
-- [stockelper-fe](https://github.com/YOUR_ORG/stockelper-fe) - Frontend
-- [stockelper-kg](https://github.com/YOUR_ORG/stockelper-kg) - Knowledge Graph
-- [stockelper-llm](https://github.com/YOUR_ORG/stockelper-llm) - LLM Service
+- [stockelper-airflow](https://github.com/Stockelper-Lab/stockelper-airflow) - Airflow DAG
+- [stockelper-fe](https://github.com/Stockelper-Lab/stockelper-fe) - Frontend
+- [stockelper-kg](https://github.com/Stockelper-Lab/stockelper-kg) - Knowledge Graph
+- [stockelper-llm](https://github.com/Stockelper-Lab/stockelper-llm) - LLM Service
 - stockelper-news-crawler (🔒 Private) - News Crawler
 
 ---
@@ -195,6 +195,3 @@ cp .bmad/templates/story.md docs/epics/STORY-001-task.md
 ## 📜 라이선스
 
 이 프로젝트는 PseudoLab Stockelper 팀에서 관리합니다.
-
-
-
