@@ -1,0 +1,95 @@
+# Stockelper BMAD Workspace Configuration
+# Version: 1.0.0
+# Created: 2024
+
+workspace:
+  name: stockelper
+  version: "1.0.0"
+  description: "Stockelper 제품 통합 BMAD 워크스페이스 - AI 기반 주식 투자 도우미"
+
+# 서비스 정의
+services:
+  - id: airflow
+    name: Stockelper Airflow
+    path: sources/airflow
+    repo: stockelper-airflow
+    visibility: public
+    type: backend
+    runtime: local
+    description: "배치/파이프라인/스케줄링, Airflow DAG 관리"
+    tech_stack:
+      - python
+      - airflow
+      - docker
+      - mongodb
+      - neo4j
+
+  - id: fe
+    name: Stockelper Frontend
+    path: sources/fe
+    repo: stockelper-fe
+    visibility: public
+    type: frontend
+    runtime: aws-t3-small
+    description: "Next.js 웹 프론트엔드, 사용자 인터페이스"
+    tech_stack:
+      - typescript
+      - nextjs
+      - prisma
+      - tailwindcss
+
+  - id: kg
+    name: Stockelper Knowledge Graph
+    path: sources/kg
+    repo: stockelper-kg
+    visibility: public
+    type: backend
+    runtime: local
+    description: "Knowledge Graph 스키마, 그래프 파이프라인, 유사도 분석"
+    tech_stack:
+      - python
+      - neo4j
+      - graphdb
+
+  - id: llm
+    name: Stockelper LLM
+    path: sources/llm
+    repo: stockelper-llm
+    visibility: public
+    type: backend
+    runtime: aws-t3-medium
+    description: "LLM 멀티에이전트, 프롬프트, 평가/실험"
+    tech_stack:
+      - python
+      - langgraph
+      - fastapi
+      - openai
+
+  - id: news-crawler
+    name: Stockelper News Crawler
+    path: sources/news-crawler
+    repo: stockelper-news-crawler
+    visibility: private  # 🔒 Private Repository
+    type: backend
+    runtime: local
+    description: "뉴스 크롤링 (Naver/Toss), 데이터 정규화"
+    tech_stack:
+      - python
+      - crawler
+      - mongodb
+
+# 팀 정보
+team:
+  organization: Stockelper-Lab
+  project: Stockelper
+
+# BMAD 설정
+bmad:
+  version: "v6"
+  agents_dir: .bmad/agents
+  policies_dir: .bmad/policies
+  blueprints_dir: .bmad/blueprints
+  templates_dir: .bmad/templates
+
+
+

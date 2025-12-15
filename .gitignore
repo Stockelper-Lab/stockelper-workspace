@@ -1,0 +1,80 @@
+# ============================================================
+# Stockelper BMAD Workspace - .gitignore
+# ============================================================
+
+# ===================
+# 서비스 소스 코드
+# ===================
+# 각 서비스는 별도 레포로 관리되므로 workspace에서는 제외
+sources/
+
+# ===================
+# Python
+# ===================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+.env
+
+# ===================
+# Node.js
+# ===================
+node_modules/
+.next/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ===================
+# IDE / Editor
+# ===================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===================
+# 환경 파일
+# ===================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+
+# ===================
+# BMAD 임시 파일
+# ===================
+.bmad/cache/
+.bmad/*.tmp
+.bmad/*.log
+
+# ===================
+# 테스트 / 커버리지
+# ===================
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ===================
+# Docker
+# ===================
+docker-compose.override.yml
+
+
+

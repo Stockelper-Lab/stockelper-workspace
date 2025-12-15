@@ -1,0 +1,120 @@
+# Stockelper Organization Policies
+# 조직 공통 가드레일 및 정책 정의
+
+organization:
+  name: Stockelper Team
+  description: "AI 기반 주식 투자 도우미 프로젝트"
+
+# 파일 정책
+file_policy:
+  allowed_extensions:
+    code:
+      - .py
+      - .ts
+      - .tsx
+      - .js
+      - .jsx
+    config:
+      - .yaml
+      - .yml
+      - .json
+      - .toml
+      - .cfg
+    docs:
+      - .md
+      - .rst
+      - .txt
+    data:
+      - .csv
+      - .sql
+  
+  max_file_size_mb: 10
+  
+  forbidden_patterns:
+    - "**/.env"
+    - "**/.env.local"
+    - "**/secrets/**"
+    - "**/*.pem"
+    - "**/*.key"
+
+# 네트워크 정책
+network_policy:
+  allowed_domains:
+    llm:
+      - api.openai.com
+      - api.anthropic.com
+    database:
+      - localhost
+      - neo4j-host
+      - mongodb-host
+      - postgresql-host
+    external:
+      - api.naver.com
+      - api.toss.im
+  
+  blocked_patterns:
+    - "*.onion"
+    - "localhost:*" # 프로덕션에서 차단
+
+# 코드 품질 정책
+code_policy:
+  require_tests: true
+  min_test_coverage: 70
+  require_docs: true
+  max_complexity: 15
+  
+  linting:
+    python:
+      - ruff
+      - mypy
+    typescript:
+      - eslint
+      - prettier
+
+# 보안 정책
+security_policy:
+  require_code_review: true
+  min_reviewers: 1
+  
+  secrets_management:
+    allowed_sources:
+      - environment_variables
+      - aws_secrets_manager
+    forbidden:
+      - hardcoded_in_code
+      - committed_env_files
+
+# 브랜치 정책
+branch_policy:
+  protected_branches:
+    - main
+    - production
+  
+  naming_convention:
+    feature: "feature/*"
+    bugfix: "bugfix/*"
+    hotfix: "hotfix/*"
+    release: "release/*"
+
+# 서비스별 오버라이드 (필요시)
+service_overrides:
+  news-crawler:
+    # Private 레포이므로 추가 보안 정책
+    security_policy:
+      require_code_review: true
+      min_reviewers: 2
+  
+  fe:
+    code_policy:
+      require_tests: true
+      min_test_coverage: 60  # 프론트엔드는 약간 낮게
+  
+  llm:
+    network_policy:
+      # LLM 서비스는 외부 API 호출 필요
+      rate_limit:
+        openai: 100/min
+        anthropic: 50/min
+
+
+

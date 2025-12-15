@@ -1,0 +1,63 @@
+# Stockelper Default Profile
+# 기본 BMAD 프로필 설정
+
+profile:
+  name: default
+  description: "Stockelper 프로젝트 기본 프로필"
+
+# 에이전트 활성화 설정
+agents:
+  analyst:
+    enabled: true
+    model: gpt-4o
+  pm:
+    enabled: true
+    model: gpt-4o
+  architect:
+    enabled: true
+    model: gpt-4o
+  dev:
+    enabled: true
+    model: gpt-4o
+  qa:
+    enabled: true
+    model: gpt-4o
+
+# 출력 설정
+output:
+  format: markdown
+  language: korean
+  verbose: true
+
+# 컨텍스트 설정
+context:
+  max_files: 50
+  max_tokens: 128000
+  include_patterns:
+    - "**/*.py"
+    - "**/*.ts"
+    - "**/*.tsx"
+    - "**/*.md"
+    - "**/README.md"
+  exclude_patterns:
+    - "**/node_modules/**"
+    - "**/__pycache__/**"
+    - "**/dist/**"
+    - "**/.next/**"
+    - "**/venv/**"
+
+# Blueprint 설정
+blueprint:
+  auto_save: true
+  output_dir: .bmad/blueprints
+  naming_pattern: "{service}_{date}.json"
+
+# 검증 설정
+verification:
+  run_tests: true
+  check_lint: true
+  check_types: true
+  require_passing: true
+
+
+
