@@ -71,8 +71,9 @@ workflow_status:
       name: "Architecture"
       agent: architect
       command: "/bmad:bmm:workflows:create-architecture"
-      status: recommended
-      note: "HIGHLY RECOMMENDED - Distills massive brownfield context into focused solution design. Prevents agent confusion."
+      status: "docs/architecture.md"
+      completed_date: "2025-12-18"
+      note: "Completed - 13 architectural decisions, 8 implementation patterns, 5 repository structures, 100% requirements coverage. Phase 0 prerequisite: LangChain v1.0+ migration identified."
 
     - id: create-epics-and-stories
       name: "Epics & Stories"

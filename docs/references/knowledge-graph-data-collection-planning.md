@@ -2,129 +2,133 @@
 
 | 클래스 | 설명 | 분리 이유 | 예시 |
 | --- | --- | --- | --- |
-| **Company** | 모든 그래프의 중심, 기업 단위 엔티티 | `corp_code` 기반 식별 가능 | 삼성전자, BYD |
-| **Event** | 기업의 사건 (공시·뉴스) | 시점, 영향, 참여 주체 표현 | 합병, 증설, 규제 |
-| **Document** | 원천 데이터 (공시, 뉴스 기사) | 이벤트와 원천 자료를 분리 (다대다 관계) | DART 2025-09A, 연합뉴스 2025-09-01 |
-| **Person** | 임원·대주주 등 실질 주체 | 시계열적 관계(임기, 지분)는 엣지에서 표현 | 이재용, 정용진 |
-| **Product** | 제품군 | 사업보고서의 “주요 제품 및 서비스” 섹션 기반 | DRAM, Galaxy S24 |
-| **Facility** | 생산라인·공장 | CAPEX/중단 이벤트 반복 축 | 평택 P3 |
-| **Observation** | 시계열 수치 데이터 | 가격, 매출, 금리 등 시점별 기록 | 종가, 매출액 |
-| **FinancialStatements** | 재무제표 계정 단위 데이터 | DART 재무 API 기반 정량 값 | 매출액, 영업이익 |
-| **Indicator** | 파생 재무지표 | PER, PBR 등 | 주당순이익(EPS), PBR |
-| **StockPrice** | 시세 데이터 | 분·일 단위 시세 | 시가, 종가, 고가, 저가 |
+| Company | 모든 그래프의 중심이 되는 기업 단위 엔티티 | corp_code 기반으로 고유 식별 가능 | 삼성전자, BYD |
+| Event | 기업의 사건(공시, 뉴스) | 시점, 영향, 참여 주체가 구분되는 행위 단위 | 합병, 증설, 규제 |
+| Document | 원천 데이터(공시, 뉴스 기사) | 이벤트와 원천 자료를 분리하여 다대다 연결 | DART 2025-09A, 연합뉴스 2025-09-01 |
+| Person | 임원·대주주 등 실질 주체 | 시계열 관계(임기, 지분)는 엣지에서 표현 | 이재용, 정용진 |
+| Product | 사업보고서의 주요 제품 및 서비스 | 제품군 단위 분석 | DRAM, Galaxy S24 |
+| Facility | 생산라인·공장 | CAPEX/중단 이벤트 반복 축 | 평택 P3 |
+| Observation | 시계열 수치 데이터 (가격, 매출, 금리 등) | 시점별 기록을 독립 노드로 관리 | 종가, 매출액 |
+| Date | 그래프 내 모든 시계열 노드와 사건을 정규화하는 날짜 노드 | 여러 이벤트/관측치가 동일 날짜를 공유하므로 중복을 방지 | 2025-01-01 |
+| FinancialStatements | 재무제표 계정 단위 데이터 | 정량 값 추적 | 매출액, 영업이익 |
+| Indicator | 파생 재무지표 | KIS 등 외부 지표 연동 | EPS, PBR |
+| StockPrice | 분/일 단위 시세 데이터 | 시장 시세를 Observation과 별도 관리 | 시가, 종가 |
+| Security | 상장 유가증권 | 회사와 종목코드 연결 | 005930, 000660 |
+| Metric | Observation 단위 지표 메타데이터 | Observation 값의 단위를 명시 | PRICE.CLOSE, SALES |
+
+**2. Entity → Property 매핑 테이블 (코드 기준)**
 
 | Entity | Property | Key | API | 메소드/표현 (Python) |
 | --- | --- | --- | --- | --- |
-| **Company** | 고유번호 | `corp_code` | OpenDART `corpCode.xml` | `cc = dart.corp_code("삼성전자")` |
-|  | 한글명 | `corp_name` | OpenDART `company.json` | `dart.company_profile(cc)["corp_name"]` |
-|  | 영문명 | `corp_name_eng` | OpenDART `company.json` | `dart.company_profile(cc)["corp_name_eng"]` |
-|  | 산업코드 | `induty_code` | OpenDART `company.json` | `dart.company_profile(cc)["induty_code"]` |
-|  | 시장구분 | `corp_cls`(Y/K/N/E) | OpenDART `company.json` | `dart.company_profile(cc)["corp_cls"]` |
-|  | 종목코드 | `stock_code` | OpenDART `company.json`/`corpCode.xml` | `dart.company_profile(cc)["stock_code"]` |
-|  | 섹터 | `std_idst_clsf_cd_name` | KIS | `kis.indicator(stock_code)  # 필요 시 별도 API로 대체` |
-|  | 자본금 | `capital_stock` | KIS / OpenDART 재무 | `dart.finstate_map_accounts(dart.finstate(cc, 2024))["capital_stock"]["value"]` |
-| **Document
-(원문)
-
-공시 Document
-/ News** | 공시번호 | `rcept_no` | OpenDART `list.json` | `df = dart.list_filings(cc,"2025-01-01","2025-12-31","B"); df.iloc[0]["rcept_no"]` |
-|  | 제목 | `report_nm` | OpenDART `list.json` | `df.iloc[0]["report_nm"]` |
-|  | 게시일 | `rcept_dt` | OpenDART `list.json` | `df.iloc[0]["rcept_dt"]` |
-|  | URL | — | DART 뷰어 | `dart.document_url(rcept_no)` |
-|  | 본문 | — | OpenDART `document.xml` | `dart.document_text(rcept_no)` |
-| **Event
-(정제)** | 사건ID | `event_id` | 내부 | `f"EVT_{rcept_no}"` |
-|  | 유형(L1) | `pblntf_ty` | OpenDART `list.json` | `row.get("pblntf_ty","B")` |
-|  | 유형(L2) | `pblntf_detail_ty` | OpenDART `list.json` | `row.get("pblntf_detail_ty", row.get("report_nm"))` |
-|  | 일자 | `reported_at` | OpenDART `list.json` | `row["rcept_dt"]` |
-|  | 일괄 변환 | — | OpenDART `list.json` | `dart.rows_to_events(df, default_kind="B")` |
-| **Person** | 이름 | `name_ko` | OpenDART `majorstock.json` 등 | `dart.major_shareholders(cc).iloc[0].get("rprt_nm")`  |
-| **Product
-(비정형)** | 제품ID | `product_id` | 사업보고서 본문 | `dart.extract_products(text, rcept_no)[0]["product_id"]` |
-|  | 제품명 | `name` | 사업보고서 본문 | `dart.extract_products(text, rcept_no)[0]["name"]` |
-|  | 제품군 | `category` | 사업보고서 본문 | `dart.extract_products(text, rcept_no)[0]["category"]` |
-| **Facility
-(비정형)** | 설비ID | `facility_id` | 사업보고서/주요사항 본문 | `dart.extract_facilities(text, rcept_no)[0]["facility_id"]` |
-|  | 지역 | `region` | 본문 | `dart.extract_facilities(text, rcept_no)[0].get("region")` |
-|  | CAPA | `capacity` | 본문 | `dart.extract_facilities(text, rcept_no)[0].get("capacity")` |
-| **FinancialStatements** | 매출액 | `revenue` | OpenDART `finstate()` | `dart.finstate_map_accounts(dart.finstate(cc, 2024))["revenue"]["value"]` |
-|  | 영업이익 | `operating_income` | OpenDART `finstate()` | `...["operating_income"]["value"]` |
-|  | 당기순이익 | `net_income` | OpenDART `finstate()` | `...["net_income"]["value"]` |
-|  | 자산총계 | `total_assets` | OpenDART `finstate()` | `...["total_assets"]["value"]` |
-|  | 부채총계 | `total_liabilities` | OpenDART `finstate()` | `...["total_liabilities"]["value"]` |
-|  | 자본총계 | `total_equity` | OpenDART `finstate()` | `...["total_equity"]["value"]` |
-|  | 자본금 | `capital_stock` | OpenDART `finstate()` | `...["capital_stock"]["value"]` |
-| **Indicator** | EPS | `eps` | KIS `inquire-price` | `kis.indicator(stock_code)["eps"]` |
-|  | PER | `per` | KIS `inquire-price` | `kis.indicator(stock_code)["per"]` |
-|  | PBR | `pbr` | KIS `inquire-price` | `kis.indicator(stock_code)["pbr"]` |
-|  | BPS | `bps` | KIS `inquire-price` | `kis.indicator(stock_code)["bps"]` |
-| **StockPrice** | 시가 | `stck_oprc` | KIS `inquire-daily-price` | `kis.daily_price(stock_code,"20250101","20250131")[0]["stck_oprc"]` |
-|  | 종가 | `stck_prpr` | KIS `inquire-daily-price` | `...["stck_prpr"]` |
-|  | 고가 | `stck_hgpr` | KIS `inquire-daily-price` | `...["stck_hgpr"]` |
-|  | 저가 | `stck_lwpr` | KIS `inquire-daily-price` | `...["stck_lwpr"]` |
-|  | 상한가 | `stck_mxpr` | KIS `inquire-daily-price` | `...["stck_mxpr"]` |
-|  | 하한가 | `stck_llam` | KIS `inquire-daily-price` | `...["stck_llam"]` |
-|  | 전일종가 | `stck_sdpr` | KIS `inquire-daily-price` | `...["stck_sdpr"]` |
+| Company | 고유번호 | corp_code | OpenDART corpCode.xml | dart.corp_code("삼성전자") |
+| Company | 한글명 | corp_name | OpenDART company.json | dart.company_profile(cc)["corp_name"] |
+| Company | 영문명 | corp_name_eng | OpenDART company.json | dart.company_profile(cc)["corp_name_eng"] |
+| Company | 산업코드 | induty_code | OpenDART company.json | dart.company_profile(cc)["induty_code"] |
+| Company | 시장구분 | corp_cls | OpenDART company.json | dart.company_profile(cc)["corp_cls"] |
+| Company | 종목코드 | stock_code | OpenDART company.json | dart.company_profile(cc)["stock_code"] |
+| Company | 섹터 | std_idst_clsf_cd_name | KIS | kis.indicator(stock_code) |
+| Company | 자본금 | capital_stock | KIS / OpenDART 재무 | dart.finstate_map_accounts(dart.finstate(cc, 2024))["capital_stock"]["value"] |
+| Event | 사건ID | event_id | 내부 | f"EVT_{rcept_no}" |
+| Event | 유형(L1) | pblntf_ty | OpenDART list.json | row.get("pblntf_ty", "B") |
+| Event | 유형(L2) | pblntf_detail_ty | OpenDART list.json | row.get("pblntf_detail_ty", row.get("report_nm")) |
+| Event | 일자 | reported_at | OpenDART list.json | row["rcept_dt"] |
+| Document | 공시번호 | rcept_no | OpenDART list.json | dart.list_filings(cc,"2025-01-01","2025-12-31","B").iloc[0]["rcept_no"] |
+| Document | 제목 | report_nm | OpenDART list.json | df.iloc[0]["report_nm"] |
+| Document | 게시일 | rcept_dt | OpenDART list.json | df.iloc[0]["rcept_dt"] |
+| Document | URL | url | DART viewer / 뉴스 링크 | dart.document_url(rcept_no) |
+| Document | 본문 | body | OpenDART document.xml / 기사 전문 | dart.document_text(rcept_no) |
+| Person | 이름 | name_ko | OpenDART majorstock.json | dart.major_shareholders(cc).iloc[0].get("rprt_nm") |
+| Product | 제품ID | product_id | 사업보고서 본문 | dart.extract_products(text, rcept_no)[0]["product_id"] |
+| Product | 제품명 | name | 사업보고서 본문 | dart.extract_products(text, rcept_no)[0]["name"] |
+| Product | 제품군 | category | 사업보고서 본문 | dart.extract_products(text, rcept_no)[0]["category"] |
+| Facility | 설비ID | facility_id | 사업보고서/주요사항 본문 | dart.extract_facilities(text, rcept_no)[0]["facility_id"] |
+| Facility | 지역 | region | 본문 | dart.extract_facilities(text, rcept_no)[0].get("region") |
+| Facility | CAPA | capacity | 본문 | dart.extract_facilities(text, rcept_no)[0].get("capacity") |
+| Observation | 지표명 | metric | 다양한 원천 | 도메인별 수집 로직 참조 |
+| Observation | 값 | value | 다양한 원천 | 수집된 시계열 값 |
+| Observation | 관측일 | observed_at | 다양한 원천 | 관측 일자 |
+| Observation | 단위 | unit | 다양한 원천 | 지표 단위 |
+| Date | 날짜 | date | 내부 | YYYY-MM-DD 또는 YYYYMMDD 포맷 |
+| Date | 연도 | year | 내부 | int(date[:4]) |
+| Date | 월 | month | 내부 | int(date.replace("-", "")[4:6]) |
+| Date | 일 | day | 내부 | int(date.replace("-", "")[6:8]) |
+| FinancialStatements | 매출액 | revenue | OpenDART finstate() | dart.finstate_map_accounts(dart.finstate(cc, 2024))["revenue"]["value"] |
+| FinancialStatements | 영업이익 | operating_income | OpenDART finstate() | ...["operating_income"]["value"] |
+| FinancialStatements | 당기순이익 | net_income | OpenDART finstate() | ...["net_income"]["value"] |
+| FinancialStatements | 자산총계 | total_assets | OpenDART finstate() | ...["total_assets"]["value"] |
+| FinancialStatements | 부채총계 | total_liabilities | OpenDART finstate() | ...["total_liabilities"]["value"] |
+| FinancialStatements | 자본총계 | total_equity | OpenDART finstate() | ...["total_equity"]["value"] |
+| FinancialStatements | 자본금 | capital_stock | OpenDART finstate() | ...["capital_stock"]["value"] |
+| Indicator | EPS | eps | KIS inquire-price | kis.indicator(stock_code)["eps"] |
+| Indicator | PER | per | KIS inquire-price | kis.indicator(stock_code)["per"] |
+| Indicator | PBR | pbr | KIS inquire-price | kis.indicator(stock_code)["pbr"] |
+| Indicator | BPS | bps | KIS inquire-price | kis.indicator(stock_code)["bps"] |
+| StockPrice | 시가 | stck_oprc | KIS inquire-daily-price | kis.daily_price(stock_code,"20250101","20250131")[0]["stck_oprc"] |
+| StockPrice | 종가 | stck_prpr | KIS inquire-daily-price | ...["stck_prpr"] |
+| StockPrice | 고가 | stck_hgpr | KIS inquire-daily-price | ...["stck_hgpr"] |
+| StockPrice | 저가 | stck_lwpr | KIS inquire-daily-price | ...["stck_lwpr"] |
+| StockPrice | 상한가 | stck_mxpr | KIS inquire-daily-price | ...["stck_mxpr"] |
+| StockPrice | 하한가 | stck_llam | KIS inquire-daily-price | ...["stck_llam"] |
+| StockPrice | 전일종가 | stck_sdpr | KIS inquire-daily-price | ...["stck_sdpr"] |
+| Security | 종목코드 | stock_code | KRX | krx.lookup(stock_name) |
+| Security | ISIN | isin | KRX | krx.lookup_isin(stock_code) |
+| Security | 티커 | ticker | 해외거래소 | custom mapping |
+| Security | 시장 | market | KRX | krx.market(stock_code) |
+| Security | 통화 | currency | KRX/KIS | krx.currency(stock_code) |
+| Metric | 지표ID | metric_id | 내부 | 도메인 정의 |
+| Metric | 지표명 | name | 내부 | 도메인 정의 |
+| Metric | 단위 | unit | 내부 | 도메인 정의 |
+| Metric | 설명 | description | 내부 | 도메인 정의 |
 
 ## Edges
 
 | 관계 | 방향 | 의미 | 예시 |
 | --- | --- | --- | --- |
-| **HAS_SECURITY** | Company → Security | 종목 코드 매핑 | 삼성전자 → 005930 |
-| **HAS_OFFICER** | Company → Person | 임원/CEO 연결 | 삼성전자 → 이재용 |
-| **HAS_SUBSIDIARY** | **Company → Company** | **그룹 관계** | **SK하이닉스 → 솔리다임** |
-| **BENEFICIAL_OWNER** | Person → Company | 지분율 관계 | 이재용 → 삼성전자 (18.1%) |
-| **INVOLVED_IN** | Company → Event | 기업이 사건에 참여 | 삼성전자 → 평택 증설 |
-| **REPORTED_BY** | Event → Document(News/DART) | 출처 연결 | 증설 결정 → DART 2025-09 |
-| **AFFECTS** | Event → Observation | 사건의 영향 | 증설 → 주가(+2.1%) |
-| **CAUSES** | **Event → Event** | **사건의 인과관계** | **ESS 수요 → 엘앤에프 주가 급등** |
-| **HAS_PRODUCT** | Company → Product | 제품군 연결 | 삼성전자 → DRAM |
-| **HAS_FACILITY** | Company → Facility | 생산라인 연결 | 삼성전자 → 평택 P3 |
-| **OF_METRIC** | Observation → Metric | 지표 단위 연결 | 70,000원 → PRICE.CLOSE |
-| **SIMILAR_TO** | Company ↔ Company
-Product ↔ Product | 산업/제품 유사성 | BYD ↔ SERES |
-| **SIMILAR_EVENT** | Event ↔ Event | 내용·시점 유사 | 증설 ↔ 증설 |
-| **SUPPLIES_TO**  | Company → Company | 제품/서비스 공급 관계(공급망) | 삼성전자 → Apple |
-| **is_competitor** | Company ↔ Company | 경쟁사 관계 | 삼성전자 ↔ Apple |
+| HAS_SECURITY | Company → Security | 종목 코드 매핑 | 삼성전자 → 005930 |
+| HAS_STOCK_PRICE | Company → StockPrice | 일별 주가 연결 | 삼성전자 → 2025-01-01 |
+| HAS_FINANCIAL_STATEMENTS | Company → FinancialStatements | 재무제표 계정 연결 | 삼성전자 → FY2024 재무제표 |
+| HAS_INDICATOR | Company → Indicator | 파생 재무지표 연결 | 삼성전자 → EPS/PER |
+| HAS_OFFICER | Company → Person | 임원/CEO 연결 | 삼성전자 → 이재용 |
+| HAS_SUBSIDIARY | Company → Company | 그룹 관계 | SK하이닉스 → 솔리다임 |
+| BENEFICIAL_OWNER | Person → Company | 지분율 관계 | 이재용 → 삼성전자 (18.1%) |
+| INVOLVED_IN | Company → Event | 기업이 사건에 참여 | 삼성전자 → 평택 증설 |
+| REPORTED_BY | Event → Document | 출처 연결 | 증설 결정 → DART 2025-09 |
+| AFFECTS | Event → Observation | 사건의 영향 | 증설 → 주가(+2.1%) |
+| CAUSES | Event → Event | 사건의 인과관계 | ESS 수요 → 엘앤에프 주가 급등 |
+| HAS_PRODUCT | Company → Product | 제품군 연결 | 삼성전자 → DRAM |
+| HAS_FACILITY | Company → Facility | 생산라인 연결 | 삼성전자 → 평택 P3 |
+| OF_METRIC | Observation → Metric | 지표 단위 연결 | 70,000원 → PRICE.CLOSE |
+| SIMILAR_TO | Company/Product ↔ Company/Product | 산업/제품 유사성 | BYD ↔ SERES |
+| SIMILAR_EVENT | Event ↔ Event | 내용·시점 유사 | 증설 ↔ 증설 |
+| SUPPLIES_TO | Company → Company | 제품/서비스 공급 관계(공급망) | 삼성전자 → Apple |
+| IS_COMPETITOR | Company ↔ Company | 경쟁사 관계 | 삼성전자 ↔ Apple |
+| HAS_EVENT | Company → Event | 레거시 이벤트 연결 | 삼성전자 → 2025Q1 |
+| OCCURRED_ON | Event → Date | 이벤트 발생일 연결 | 증설 → 2025-09-01 |
+| RECORDED_ON | StockPrice → Date | 시세 기록 날짜 | 주가 → 2025-09-01 |
 
 ## Event Ontology
 
-| event_type | 설명 | 핵심 슬롯(필수→선택) |
-| --- | --- | --- |
-| `SUPPLY_CAPACITY_CHANGE` | 증설/감산/생산능력 변경 | `facility_id`, `capacity_delta` → `duration` |
-| `SUPPLY_HALT` | 라인/사업장 가동중단 | `facility_id` → `duration`,`reason` |
-| `DEMAND_SALES_CONTRACT` | 단일판매/공급계약 | `counterparty`, `contract_value` → `duration`,`product_id` |
-| `REVENUE_EARNINGS` | 실적(매출/영업익/순익) | `period`, `metric`(REV/OP/NP), `value` |
-| `EFFICIENCY_AUTOMATION` | 자동화/라인개선 투자 | `investment_amount` → `process` |
-| `STRATEGY_MNA` | M&A(합병/영업양수도 등) | `counterparty`, `deal_value` → `region` |
-| `STRATEGY_SPINOFF` | 분할/분할합병 | `counterparty` → `deal_value`,`region` |
-| `STRATEGY_OVERSEAS` | 해외 투자/법인/설비 | `region` → `investment_amount`,`facility_id` |
-| `TECH_NEW_PRODUCT` | 신제품/기술 출시 | `product_id` → `launch_date` |
-| `POLICY_REGULATORY` | 규제/제재/과징금 | `regulator` → `penalty` |
-| `LEGAL_LITIGATION` | 소송/중재 | `counterparty` → `claim_value`,`court` |
-| `OTHER` | 기타(미분류) | — |
-
-| **Event Type** | **설명** | **필수 슬롯 (Required)** | **선택 슬롯**  | **기업 (사례)** | **뉴스 요약 및 링크** |
+| Event Type | 설명 | 필수 슬롯 (Required) | 선택 슬롯 (Optional) | **기업 (사례)** | **뉴스 요약 및 링크** |
 | --- | --- | --- | --- | --- | --- |
-| SUPPLY_CAPACITY_CHANGE | 증설/감산/생산능력 변경 | facility_id, capacity_delta | duration, total_capacity | 삼성전자 | 평택 P4 단계 공사비 증액·일정 앞당김 보도(약 4.2조원 증액).﻿[**코리아중앙일보**](https://koreajoongangdaily.joins.com/news/2025-10-20/business/industry/Samsung-ups-Pyeongtaek-chip-plant-contract-to-3B-amid-AI-boom/2421898?utm_source=chatgpt.com) |
-| SUPPLY_HALT | 라인/사업장 가동중단 | facility_id | duration, reason, impact | POSCO홀딩스 | 태풍 ‘힌남노’로 포항제철소 침수→가동 중단.﻿[**연합뉴](https://www.yna.co.kr/view/AKR20241110007400053)[스](https://www.yna.co.kr/view/AKR20220907022400003)** |
-| DEMAND_SALES_CONTRACT | 단일판매/공급계약(체결/해지) | counterparty, contract_value | duration, product_id | 하나기술 | 1,700억 규모 2차전지 장비 공급계약 해지 공시 후 급락.﻿[**뉴스](https://www.news1.kr/finance/general-stock/5454691)[1](https://www.news1.kr/articles/?4031234)** |
-| REVENUE_EARNINGS | 분기/연간 실적 발표 | period, metric, value | consensus_comparison, previous_comparison | 삼성전자 | 2024년 4Q 실적 발표(2025-01-31) 관련 보도.﻿[**연합뉴](https://www.yna.co.kr/view/AKR20250131029152003)[스](https://www.yna.co.kr/view/AKR20250131004200003)** |
-| EFFICIENCY_AUTOMATION | 자동화/라인개선/스마트팩토리 | investment_amount | process, facility_id, expected_effect | 포스코DX | 스마트팩토리·AI 물류/자동화 확대 추진 기사.﻿[**핀포인트뉴](https://www.pinpointnews.co.kr/news/articleView.html?idxno=386479)[스](https://pinpointnews.kr/articles/2025/10/08/ai-factory)** |
-| STRATEGY_MNA | M&A(합병/영업양수도) | counterparty, deal_value | region, mna_type | 한화그룹 | 대우조선해양(현 한화오션) 인수 본계약 체결.﻿[**인베스트조](https://www.investchosun.com/site/data/html_dir/2022/12/16/2022121680129.html)[선](https://investchosun.com/news/articleView.html?idxno=4567)** |
-| STRATEGY_SPINOFF | 인적/물적 분할·분할합병 | counterparty | deal_value, region, spinoff_type | SK텔레콤 | SK텔레콤/ SK스퀘어 인적분할 후 재상장.﻿[**ZDNet Kore](https://zdnet.co.kr/view/?no=20211126165954)[a](https://zdnet.co.kr/view/?no=20211129092756)** |
-| STRATEGY_OVERSEAS | 해외 투자/법인/설비 | region, investment_amount | facility_id, purpose | 삼성바이오로직스 | 美 인디애나 주지사 측과 회동, 현지 공장 후보 논의.﻿[**조선비즈**](https://biz.chosun.com/it-science/bio-science/2022/08/31/ZXJA4GYQ35H2LPXKSHUP5WGHOM/?utm_source=chatgpt.com) |
-| STRATEGY_PARTNERSHIP | 전략적 제휴·합작(JV)·공동연구 | counterparty, purpose | investment_amount, region, capacity_plan | Samsung SDI | GM·스텔란티스와 북미 배터리 합작·공장 구축 보도.﻿[**코리아타임스**](https://www.koreatimes.co.kr/business/companies/20220826/samsung-sdi-chief-meets-with-indiana-governor-over-ev-battery-joint-venture?utm_source=chatgpt.com) |
-| TECH_NEW_PRODUCT | 신제품/신기술 출시 | product_id | launch_date, specs, target_market | 한미반도체 | HBM 공정 핵심 ‘TC 본더’ 대규모 공급 기대 기사.﻿[[연합인포맥스](https://www.yna.co.kr/view/AKR20250421134600003)/업계보] |
-| WORKFORCE_EVENT | 인력 감축/채용/파업/합의 | action_type, num_employees | duration, participants, reason | 현대자동차 | 임단협 관련 파업·합의 이슈(대표 예시).﻿[**연합뉴스 유사 사례 다](https://v.daum.net/v/20250916032340343)[수](https://www.yna.co.kr/view/AKR20230501007600003)** |
-| LEGAL_LITIGATION | 소송/중재/내부 분쟁 | counterparty | claim_value, court, litigation_type | 하이브 | 어도어 경영권 갈등 확산 보도 후 급락. [ytn](https://www.ytn.co.kr/_ln/0103_202404241631105527) |
-| CRISIS_EVENT | 화재·사이버공격·대규모 서비스장애 | incident_type, location | impact, cause, damage_estimate | 카카오 | 판교 데이터센터 화재로 장기 장애, 그룹주 급락.[연합뉴스](https://www.yna.co.kr/view/AKR20221017029300002) |
-| PRODUCT_RECALL | 품질 결함/리콜/단종 | product_id, issue | scope, cost_impact | 현대차/기아 | 북미 330만대 리콜(엔진화재 위험) 보도.﻿[**Investing.co](https://kr.investing.com/news/stock-market-news/article-950748)[m](https://investing.com/news/auto/hyundai-kia-recall-20230928)** |
-| POLICY_IMPACT | 정책 변화(수혜/규제) | policy_name, impact_type | region, value | 저PBR/금융권 | 정부 ‘밸류업 프로그램’ 기대/발표에 저PBR주 급등.﻿[**인베스트조선/로이터**](https://www.investchosun.com/site/data/html_dir/2024/02/26/2024022680144.html) |
-| VIRAL_EVENT | 테마/밈/유명인 발언·바이럴 | trigger, sector | score, duration | 국장 밈? | 밈 주식 등등 |
-| OWNERSHIP_CHANGE | 오너/대주주 지분 변동(블록딜 등) | actor, stake_change | purpose, value | 삼성전자(오너일가) | 오너일가 블록딜/지분매각(상속세 등 재원).﻿[[로이터/조선비즈](https://www.notion.so/2a54f28ae08480749506c9d5508a1742?pvs=21)] |
-| REGULATORY_APPROVAL | 신약/면허/인허가 승인 | regulator, approval_type, product_id | region, details | 유한양행 | 폐암치료제 ‘렉라자’ 美 FDA 승인 보도.﻿[**비즈니스포스트**](https://www.businesspost.co.kr/BP?command=article_view&num=363694) |
-| OTHER | 기타(미분류) | description | — | — | - |
+| SUPPLY_CAPACITY_CHANGE | 공장 건설/증설/감산/생산능력 변경/설비투자 | date | facility_id, capacity_delta, duration, total_capacity, investment_amount | 삼성전자 | 평택 P4 단계 공사비 증액·일정 앞당김 보도(약 4.2조원 증액).﻿[**코리아중앙일보**](https://koreajoongangdaily.joins.com/news/2025-10-20/business/industry/Samsung-ups-Pyeongtaek-chip-plant-contract-to-3B-amid-AI-boom/2421898?utm_source=chatgpt.com) |
+| SUPPLY_HALT | 라인/사업장 가동중단 | date | facility_id, duration, reason, impact | POSCO홀딩스 | 태풍 ‘힌남노’로 포항제철소 침수→가동 중단.﻿[**연합뉴](https://www.yna.co.kr/view/AKR20241110007400053)[스](https://www.yna.co.kr/view/AKR20220907022400003)** |
+| DEMAND_SALES_CONTRACT | 단일판매/공급계약 체결 또는 해지 (수주/발주/계약종료 포함) | counterparty, contract_value, date | duration, product_id | 하나기술 | 1,700억 규모 2차전지 장비 공급계약 해지 공시 후 급락.﻿[**뉴스](https://www.news1.kr/finance/general-stock/5454691)[1](https://www.news1.kr/articles/?4031234)** |
+| REVENUE_EARNINGS | 분기/연간 실적 발표 (잠정실적 포함) | period, metric, value, date | consensus_comparison, previous_comparison | 삼성전자 | 2024년 4Q 실적 발표(2025-01-31) 관련 보도.﻿[**연합뉴](https://www.yna.co.kr/view/AKR20250131029152003)[스](https://www.yna.co.kr/view/AKR20250131004200003)** |
+| EFFICIENCY_AUTOMATION | 스마트팩토리/자동화/DX/공정개선 투자 | date | investment_amount, process, facility_id, expected_effect | 포스코DX | 스마트팩토리·AI 물류/자동화 확대 추진 기사.﻿[**핀포인트뉴](https://www.pinpointnews.co.kr/news/articleView.html?idxno=386479)[스](https://pinpointnews.kr/articles/2025/10/08/ai-factory)** |
+| STRATEGY_MNA | M&A/인수합병/지분투자 (경영권 확보 목적 시 우선) | counterparty, deal_value, date | region, mna_type, stake_percentage | 한화그룹 | 대우조선해양(현 한화오션) 인수 본계약 체결.﻿[**인베스트조](https://www.investchosun.com/site/data/html_dir/2022/12/16/2022121680129.html)[선](https://investchosun.com/news/articleView.html?idxno=4567)** |
+| STRATEGY_SPINOFF | 인적/물적 분할·분할합병 | counterparty, date | deal_value, region, spinoff_type | SK텔레콤 | SK텔레콤/ SK스퀘어 인적분할 후 재상장.﻿[**ZDNet Kore](https://zdnet.co.kr/view/?no=20211126165954)[a](https://zdnet.co.kr/view/?no=20211129092756)** |
+| STRATEGY_OVERSEAS | 해외 투자/법인 설립/해외 진출 | region, date | investment_amount, facility_id, purpose | 삼성바이오로직스 | 美 인디애나 주지사 측과 회동, 현지 공장 후보 논의.﻿[**조선비즈**](https://biz.chosun.com/it-science/bio-science/2022/08/31/ZXJA4GYQ35H2LPXKSHUP5WGHOM/?utm_source=chatgpt.com) |
+| STRATEGY_PARTNERSHIP | 전략적 제휴/MOU/합작법인(JV)/공동연구 | counterparty, purpose, date | investment_amount, region, capacity_plan | Samsung SDI | GM·스텔란티스와 북미 배터리 합작·공장 구축 보도.﻿[**코리아타임스**](https://www.koreatimes.co.kr/business/companies/20220826/samsung-sdi-chief-meets-with-indiana-governor-over-ev-battery-joint-venture?utm_source=chatgpt.com) |
+| TECH_NEW_PRODUCT | 신제품/신기술/신규 서비스 출시 | product_id, date | launch_date, specs, target_market | 한미반도체 | HBM 공정 핵심 ‘TC 본더’ 대규모 공급 기대 기사.﻿[[연합인포맥스](https://www.yna.co.kr/view/AKR20250421134600003)/업계보] |
+| WORKFORCE_EVENT | 인력 감축/채용/파업/노사합의 | action_type, num_employees, date | duration, participants, reason | 현대자동차 | 임단협 관련 파업·합의 이슈(대표 예시).﻿[**연합뉴스 유사 사례 다](https://v.daum.net/v/20250916032340343)[수](https://www.yna.co.kr/view/AKR20230501007600003)** |
+| LEGAL_LITIGATION | 소송/특허분쟁/규제기관 제재/벌금 | counterparty, date | claim_value, court, litigation_type | 하이브 | 어도어 경영권 갈등 확산 보도 후 급락. [ytn](https://www.ytn.co.kr/_ln/0103_202404241631105527) |
+| CRISIS_EVENT | 화재/폭발/횡령/배임/사이버공격 (생산 중단이 있으면 SUPPLY_HALT 우선) | incident_type, location, date | impact, cause, damage_estimate | 카카오 | 판교 데이터센터 화재로 장기 장애, 그룹주 급락.[연합뉴스](https://www.yna.co.kr/view/AKR20221017029300002) |
+| PRODUCT_RECALL | 리콜/판매중단/품질결함 | issue, date | product_id, scope, cost_impact | 현대차/기아 | 북미 330만대 리콜(엔진화재 위험) 보도.﻿[**Investing.co](https://kr.investing.com/news/stock-market-news/article-950748)[m](https://investing.com/news/auto/hyundai-kia-recall-20230928)** |
+| POLICY_IMPACT | 정부 정책/규제 변화/세제 혜택 | policy_name, impact_type, date | region, value | 저PBR/금융권 | 정부 ‘밸류업 프로그램’ 기대/발표에 저PBR주 급등.﻿[**인베스트조선/로이터**](https://www.investchosun.com/site/data/html_dir/2024/02/26/2024022680144.html) |
+| VIRAL_EVENT | 테마주/밈/유명인 발언 | trigger, sector, date | score, duration | 국장 밈? | 밈 주식 등등 |
+| OWNERSHIP_CHANGE | 최대주주 변경/지분 매각/블록딜 (경영권 인수 목적 M&A는 STRATEGY_MNA) | actor, stake_change, date | purpose, value | 삼성전자(오너일가) | 오너일가 블록딜/지분매각(상속세 등 재원).﻿[[로이터/조선비즈](https://www.notion.so/2a54f28ae08480749506c9d5508a1742?pvs=21)] |
+| REGULATORY_APPROVAL | FDA 승인/품목허가/임상 결과/특허 등록 등 규제 승인 | regulator, approval_type, product_id, date | region, details | 유한양행 | 폐암치료제 ‘렉라자’ 美 FDA 승인 보도.﻿[**비즈니스포스트**](https://www.businesspost.co.kr/BP?command=article_view&num=363694) |
+| OTHER | 위 분류에 해당하지 않는 기타 뉴스 | description, date | (없음) | — | - |
 
 https://www.tldraw.com/f/vzUgFYSZpy52fje-Om68k?d=v-2168.-467.6089.3426.page
 
