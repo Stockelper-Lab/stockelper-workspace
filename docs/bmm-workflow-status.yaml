@@ -63,8 +63,9 @@ workflow_status:
       name: "UX Design"
       agent: ux-designer
       command: "/bmad:bmm:workflows:create-ux-design"
-      status: conditional
-      condition: "if_has_ui"
+      status: "docs/ux-design-specification.md"
+      completed_date: "2025-12-22"
+      note: "Completed - Core UX defined: chat-first event-driven predictions with transparency and trust-building emotional design"
 
   solutioning:
     - id: create-architecture
@@ -79,8 +80,9 @@ workflow_status:
       name: "Epics & Stories"
       agent: pm
       command: "/bmad:bmm:workflows:create-epics-stories"
-      status: required
-      note: "Break down PRD into implementable epics and stories with full context"
+      status: "docs/epics.md"
+      completed_date: "2025-12-23"
+      note: "Completed - 6 epics (Epic 0-5) with 37 user stories. Epic 0: LangChain v1 Migration (10 stories), Epic 1: Event Intelligence Automation (5 stories), Epic 2: Portfolio UI & Scheduling (5 stories), Epic 3: Backtesting Engine (6 stories), Epic 4: Alerts & Notifications (6 stories), Epic 5: Compliance & Audit (5 stories)"
 
     - id: test-design
       name: "Test Design"
