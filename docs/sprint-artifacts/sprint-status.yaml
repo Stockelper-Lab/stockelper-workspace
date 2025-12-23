@@ -1,0 +1,89 @@
+# generated: 2025-12-23
+# project: Stockelper
+# tracking_system: file-system
+# story_location: docs/sprint-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - drafted: Story file created in stories folder
+#   - ready-for-dev: Draft approved, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done by *retrospective
+#
+# WORKFLOW NOTES:
+# ===============
+# - Mark epic as 'in-progress' when starting work on its first story
+# - SM typically drafts next story ONLY after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then Dev runs code-review (fresh context, ideally different LLM)
+
+generated: 2025-12-23
+project: Stockelper
+tracking_system: file-system
+story_location: docs/sprint-artifacts
+
+development_status:
+  epic-0: in-progress
+  0-1-update-langchain-dependencies-and-core-imports: in-progress
+  0-2-migrate-supervisoragent-to-langchain-v1: backlog
+  0-3-migrate-marketanalysisagent-to-langchain-v1: backlog
+  0-4-migrate-fundamentalanalysisagent-to-langchain-v1: backlog
+  0-5-migrate-technicalanalysisagent-to-langchain-v1: backlog
+  0-6-migrate-portfolioanalysisagent-to-langchain-v1: backlog
+  0-7-migrate-investmentstrategyagent-to-langchain-v1: backlog
+  0-8-migrate-event-extraction-service-to-gpt-4-1: backlog
+  0-9-portfolio-multi-agent-system-integration-testing: backlog
+  epic-0-retrospective: optional
+
+  epic-1: backlog
+  1-1-automate-event-extraction-with-airflow-dag: backlog
+  1-2-frontend-event-timeline-visualization: backlog
+  1-3-multi-timeframe-prediction-ui-with-confidence-indicators: backlog
+  1-4-rich-chat-prediction-cards-with-historical-context: backlog
+  1-5-suggested-queries-based-on-portfolio: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-investment-profile-questionnaire-during-sign-up: backlog
+  2-2-kis-openapi-key-registration-during-sign-up: backlog
+  2-3-portfolio-tracking-ui-add-remove-view-stocks: backlog
+  2-4-dedicated-portfolio-recommendation-page-button-triggered: backlog
+  2-5-scheduled-daily-portfolio-recommendations-9-am: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-async-backtesting-job-queue-infrastructure: backlog
+  3-2-event-based-strategy-simulator: backlog
+  3-3-historical-return-calculation-3-6-12-months: backlog
+  3-4-sharpe-ratio-calculation-and-baseline-comparison: backlog
+  3-5-backtesting-results-visualization-with-charts: backlog
+  3-6-backtesting-request-via-chat-interface: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-real-time-event-monitoring-service-neo4j-pattern-matching: backlog
+  4-2-airflow-event-alert-monitoring-dag: backlog
+  4-3-notification-service-backend-postgresql-notifications-table: backlog
+  4-4-frontend-gnb-notification-icon-with-badge-polling-pattern: backlog
+  4-5-notification-center-dropdown: backlog
+  4-6-event-alert-preferences-configuration: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-embedded-disclaimers-in-predictions-and-recommendations: backlog
+  5-2-prediction-audit-logging-postgresql-with-12-month-retention: backlog
+  5-3-rate-limiting-middleware: backlog
+  5-4-frontend-legal-pages-terms-of-service-privacy-policy: backlog
+  5-5-complete-event-extraction-automation-dag-dual-pipeline: backlog
+  epic-5-retrospective: optional
