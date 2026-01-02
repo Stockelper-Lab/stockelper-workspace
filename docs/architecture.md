@@ -86,8 +86,10 @@ The production build and runtime assumptions are updated based on recent meeting
   - **Repository split plan**: `.../Stockelper-Lab/stockelper-portfolio/` (separate repo)
 - **Result persistence**
   - Backtesting/Portfolio results are stored in a **remote PostgreSQL** used by the frontend.
-  - **Host**: `${POSTGRES_HOST}` (default port: `5432`)
-  - **User**: `postgre` (password must be injected via secrets/env; do not commit)
+  - **Host**: `${POSTGRES_HOST}` (injected via environment variable)
+  - **Port**: `${POSTGRES_PORT}` (default: 5432)
+  - **User**: `${POSTGRES_USER}` (injected via environment variable)
+  - **Password**: `${POSTGRES_PASSWORD}` (injected via environment variable)
   - **Schema name**: `"stockelper-fe"` (note: hyphen requires quoting in PostgreSQL identifiers)
   - **Credentials must NOT be hard-coded in repositories**. Use environment variables / secret manager.
 - **De-scoped local containers (do not use)**
