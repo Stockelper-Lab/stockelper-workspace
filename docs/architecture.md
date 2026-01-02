@@ -54,7 +54,7 @@ Critical NFRs that will drive architectural decisions:
 
 - **Primary domain:** Full-stack AI-powered fintech platform (web + backend services + data pipelines + ML/AI)
 - **Complexity level:** High
-  - Brownfield extension of existing 5-microservice system → expanding to 7 microservices
+  - Brownfield extension of existing 5-microservice system → expanding to 6 microservices
   - AI/ML with multi-agent LangGraph system (gpt-5.1 models)
   - Graph database (Neo4j) with temporal pattern matching
   - Real-time event detection and alerting via Supabase Realtime
