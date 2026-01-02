@@ -1122,8 +1122,16 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 
 ### Event Intelligence & Knowledge Graph
 
-- **FR1:** System can extract financial events from Korean news articles (Naver Finance)
-- **FR2:** System can extract financial events from DART disclosure data
+- **FR1:** System can extract financial events from Korean news articles (Naver Finance) with sentiment score (-1 to 1 range)
+- **FR1a:** System can extract news data via 6-month batch CLI for historical backfill
+- **FR1b:** System can collect news data on 3-hour interval schedule (00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00)
+- **FR1c:** System can assign source attribute "NEWS" to all news-extracted events
+- **FR2:** System can extract financial events from DART disclosure data with sentiment score (-1 to 1 range)
+- **FR2a:** System can use distinct extraction prompts for DART vs NEWS data
+- **FR2b:** System can assign source attribute "DART" to all DART-extracted events
+- **FR2c:** System can standardize sentiment score to 0 for dates with no extracted events
+- **FR2d:** System can classify DART events into 7 major categories: (1) Capital Changes, (2) M&A & Governance, (3) Financial, (4) Business Operations, (5) Dividends, (6) Legal, (7) Other
+- **FR2e:** System can extract event context from DART disclosures: amount, market cap ratio, purpose, timing (장중 vs 장마감)
 - **FR3:** System can classify extracted events into defined ontology categories
 - **FR4:** System can store events in Neo4j knowledge graph with date indexing
 - **FR5:** System can capture event metadata (entities, conditions, categories, dates)
@@ -1160,8 +1168,16 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 ### Backtesting & Validation
 
 - **FR29:** Users can manually initiate backtesting for specific stocks via chat
+- **FR29a:** LLM can extract backtesting parameters (universe, strategy) from user chat input
+- **FR29b:** LLM can prompt users with follow-up questions if backtesting parameters are unclear (human-in-the-loop)
+- **FR29c:** System can respond to backtesting requests with "Backtesting in progress, navigate to [backtesting page] to check status"
 - **FR30:** Users can manually initiate backtesting for specific investment strategies via chat
+- **FR30a:** System can execute backtesting in separate container backend (not LLM server)
+- **FR30b:** System can send backtesting parameters (universe, strategy, user_id) from LLM to backtesting container
 - **FR31:** System can retrieve historical instances of similar events for backtesting
+- **FR31a:** System can notify frontend when backtesting execution completes
+- **FR31b:** System can generate backtesting results as downloadable report
+- **FR31c:** Users can view backtesting results on dedicated results page (not chat interface)
 - **FR32:** System can calculate 3-month historical returns for event-based strategies
 - **FR33:** System can calculate 6-month historical returns for event-based strategies
 - **FR34:** System can calculate 12-month historical returns for event-based strategies
@@ -1255,6 +1271,40 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 - **FR101:** System can throttle queries to prevent system abuse
 - **FR102:** System can monitor for anomalous usage patterns
 - **FR103:** System can prevent alert spam to users
+
+### Real-Time Notifications & Supabase Integration
+
+- **FR104:** Frontend can subscribe to PostgreSQL table changes via Supabase Realtime
+- **FR105:** System can deliver browser notifications when backtesting jobs complete
+- **FR106:** System can deliver browser notifications when portfolio recommendations complete
+- **FR107:** Frontend UI updates in real-time when DB state changes (no polling required)
+- **FR108:** Browser notifications follow Confluence-style UX pattern (accumulating, non-intrusive)
+
+### Portfolio Recommendation Page
+
+- **FR109:** Users can access dedicated portfolio recommendation page
+- **FR110:** Users can generate portfolio recommendations via button click on dedicated page
+- **FR111:** System displays accumulated portfolio recommendations sorted by most recent first
+- **FR112:** Each recommendation shows creation timestamp and status indicator
+- **FR113:** System displays warning message for outdated portfolio recommendations (>3 days old)
+- **FR114:** Users can view full Markdown recommendation report by clicking row
+
+### Unified Data Model
+
+- **FR115:** System stores backtesting results with unified schema: content (Markdown), user_id, image_base64, timestamps, status
+- **FR116:** System stores portfolio recommendations with unified schema: content (Markdown), user_id, image_base64, timestamps, status
+- **FR117:** Status transitions managed by agents/backend: PENDING → IN_PROGRESS → COMPLETED/FAILED
+- **FR118:** LLM-generated content stored as Markdown in `content` field
+- **FR119:** Agents/backend services fully own data generation, status transitions, and database operations
+- **FR120:** Frontend only subscribes to Supabase Realtime and renders UI (does not define schema or push data)
+
+### Backtesting Results Page (Enhanced)
+
+- **FR121:** Backtesting results page displays jobs in table/list format sorted by most recent first
+- **FR122:** Clicking backtesting job row opens LLM-generated Markdown report on same page (not new page)
+- **FR123:** Backtesting page updates in real-time via Supabase Realtime subscription
+- **FR124:** Each backtesting job row shows: stock name, strategy, status, creation timestamp
+- **FR125:** Backtesting Markdown reports include charts, tables, and performance metrics
 
 ## Non-Functional Requirements
 

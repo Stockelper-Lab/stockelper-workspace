@@ -413,7 +413,7 @@ The PRD provides sufficient detail for epic and story creation. All core functio
 #### Event Intelligence & Knowledge Graph (FR1-FR8) - Epic 1
 - ✓ FR1: Event extraction from news - **Epic 1, Story 1.1** (Automated Airflow DAG)
 - ✓ FR2: Event extraction from DART - **Epic 5, Story 5.5** (DART Pipeline DAG)
-- ✓ FR3: Event classification into ontology - **Epic 0, Story 0.8** (gpt-4.1 upgrade), **already complete** (ontology management)
+- ✓ FR3: Event classification into ontology - **Epic 0, Story 0.8** (gpt-5.1 upgrade), **already complete** (ontology management)
 - ✓ FR4: Neo4j storage with date indexing - **Epic 1, Story 1.1** (Airflow DAG integration)
 - ✓ FR5: Event metadata capture - **Epic 1, Story 1.1, 1.2** (visualization includes metadata)
 - ✓ FR6: Entity relationships in subgraphs - **Already implemented** in Neo4j schema
@@ -1230,7 +1230,7 @@ The Stockelper project has completed a comprehensive Solutioning phase with all 
 
 3. **Execute Epic 0 Stories 0.1-0.9 (revised from 0.1-0.10)**
    - Migrate all 6 LangGraph agents from LangChain v0 to v1
-   - Upgrade to gpt-4.1 for prediction accuracy
+   - Upgrade to gpt-5.1 for prediction accuracy
    - Ensure chat interface and prediction engine functional
    - **Gate Criterion:** Epic 0 complete before any Epic 1-5 work begins
 

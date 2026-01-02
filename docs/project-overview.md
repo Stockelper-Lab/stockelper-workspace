@@ -11,7 +11,7 @@ Stockelper is a comprehensive AI-powered stock investment assistant platform for
 ## Project Structure
 
 **Repository Type:** Multi-part workspace with symlinked repositories
-**Total Parts:** 5 independent services
+**Total Parts:** 7 independent services (Backtesting/Portfolio services added)
 **Primary Technologies:** TypeScript (Frontend) + Python (Backend Services)
 **Architecture Pattern:** Microservices with shared data layer
 
@@ -52,6 +52,22 @@ Stockelper is a comprehensive AI-powered stock investment assistant platform for
 - **Purpose:** Scrape Korean financial news from Naver and store in MongoDB
 - **Path:** `sources/news-crawler/`
 
+### 6. Backtesting Service (backtesting)
+- **Type:** Backend Service (separate container)
+- **Framework:** FastAPI (planned)
+- **Language:** Python 3.12+
+- **Purpose:** Execute backtesting jobs asynchronously and persist results for frontend consumption
+- **Deployment:** Local (initial phase)
+- **Repository split plan:** `../stockelper-backtesting/` (separate repo)
+
+### 7. Portfolio Service (portfolio)
+- **Type:** Backend Service (separate container)
+- **Framework:** FastAPI (planned)
+- **Language:** Python 3.12+
+- **Purpose:** Generate portfolio recommendations (button-triggered from dedicated page) and persist results for frontend consumption
+- **Deployment:** Local (initial phase)
+- **Repository split plan:** `../stockelper-portfolio/` (separate repo)
+
 ## Technology Stack Summary
 
 | Part | Primary Tech | Framework/Runtime | Database(s) |
@@ -61,6 +77,8 @@ Stockelper is a comprehensive AI-powered stock investment assistant platform for
 | LLM Service | Python 3.12+ | FastAPI, LangGraph | PostgreSQL, MongoDB, Neo4j |
 | Knowledge Graph | Python 3.12 | CLI | Neo4j, MongoDB |
 | News Crawler | Python 3.11+ | Typer CLI | MongoDB |
+| Backtesting Service | Python 3.12+ | FastAPI | PostgreSQL (remote, schema `"stockelper-fe"`) |
+| Portfolio Service | Python 3.12+ | FastAPI | PostgreSQL (remote, schema `"stockelper-fe"`) |
 
 ## Architecture Type
 
@@ -90,10 +108,18 @@ Stockelper is a comprehensive AI-powered stock investment assistant platform for
 ## Integration Points
 
 1. **Frontend ↔ LLM Service:** REST API calls for AI analysis
-2. **LLM Service ↔ Knowledge Graph:** Neo4j queries for entity relationships
-3. **Airflow ↔ All Services:** Data pipeline triggers and updates
-4. **News Crawler → MongoDB:** Financial news storage
-5. **Knowledge Graph Builder → Neo4j:** Graph construction and updates
+2. **Frontend ↔ Portfolio Service:** Dedicated portfolio recommendation page triggers backend job and reads accumulated history
+3. **Frontend ↔ Backtesting Service:** Dedicated backtesting results page triggers jobs and reads job/status/result
+4. **LLM Service ↔ Knowledge Graph:** Neo4j queries for entity relationships
+5. **Airflow ↔ All Services:** Data pipeline triggers and updates
+6. **News Crawler → MongoDB:** Financial news storage
+7. **Knowledge Graph Builder → Neo4j:** Graph construction and updates
+
+## Deployment Notes (Updated 2025-12-30)
+
+- **`stockelper-llm-server`** is built and deployed on **AWS EC2**, using `stockelper-llm/cloud.docker-compose.yml` as the source of truth.
+- **`stockelper-backtesting-server`** and **`stockelper-portfolio-server`** are built and run **locally** (initial phase).
+- Backtesting/Portfolio results are persisted into a **remote PostgreSQL** schema **`"stockelper-fe"`** (credentials must be injected via env/secret manager; do not commit secrets).
 
 ## Getting Started
 

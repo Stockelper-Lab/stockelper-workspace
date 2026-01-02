@@ -452,7 +452,7 @@ services:
 **Score:** 4 (CONCERN)
 
 **Description:**
-- Event extraction uses gpt-4.1 (post-Epic 0) for classification
+- Event extraction uses gpt-5.1 (post-Epic 0) for classification
 - LLM outputs non-deterministic even with `temperature=0`
 - Exact event descriptions may vary run-to-run
 
@@ -480,7 +480,7 @@ Before implementing Epic 1-5 tests, complete the following foundational work:
 
 **Critical Prerequisite:**
 - Migrate all 6 agents to LangChain v1.0+ patterns
-- Update model references from gpt-4o to gpt-4.1
+- Update model references from gpt-5.1 to gpt-5.1
 - Validate multi-agent system integration
 - Run Epic 0 Story 0.9 (Integration Testing) to ensure no regressions
 

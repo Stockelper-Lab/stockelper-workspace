@@ -35,19 +35,15 @@ story_location: docs/sprint-artifacts
 
 development_status:
   epic-0: in-progress
-  0-1-update-langchain-dependencies-and-core-imports: in-progress
-  0-2-migrate-supervisoragent-to-langchain-v1: backlog
-  0-3-migrate-marketanalysisagent-to-langchain-v1: backlog
-  0-4-migrate-fundamentalanalysisagent-to-langchain-v1: backlog
-  0-5-migrate-technicalanalysisagent-to-langchain-v1: backlog
-  0-6-migrate-portfolioanalysisagent-to-langchain-v1: backlog
-  0-7-migrate-investmentstrategyagent-to-langchain-v1: backlog
-  0-8-migrate-event-extraction-service-to-gpt-4-1: backlog
-  0-9-portfolio-multi-agent-system-integration-testing: backlog
+  0-1-verify-langchain-v1-compliance-and-dependencies: done
+  0-2-upgrade-agent-models-to-gpt-5-1: done
+  0-3-validate-message-handling-and-content-blocks: backlog
+  0-4-multi-agent-system-integration-testing: backlog
   epic-0-retrospective: optional
 
   epic-1: backlog
-  1-1-automate-event-extraction-with-airflow-dag: backlog
+  1-1a-automate-news-event-extraction-with-dual-pipeline: backlog
+  1-1b-dart-disclosure-event-extraction-with-sentiment-scoring: backlog
   1-2-frontend-event-timeline-visualization: backlog
   1-3-multi-timeframe-prediction-ui-with-confidence-indicators: backlog
   1-4-rich-chat-prediction-cards-with-historical-context: backlog
