@@ -134,6 +134,7 @@
 Domain and planning documents:
 
 - [DART Main Events](./references/DART(main events).md) - Korean financial disclosure system events
+- [DART Disclosure Ingestion Spec](./dart-disclosure-ingestion.md) - Bulk backfill + daily incremental ingestion, event extraction, sentiment scoring
 - [Knowledge Graph Data Collection Planning](./references/knowledge-graph-data-collection-planning.md) - Comprehensive KG strategy (62KB)
 - [Portfolio Recommendation & User Investment Preferences](./references/portfolio-rec-user-investment-pref.md) - Investment preference modeling
 - [2026-11-17 Planning Doc](./references/20261117.md) - Project planning document
