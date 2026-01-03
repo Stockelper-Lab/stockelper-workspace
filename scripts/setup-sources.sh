@@ -34,12 +34,16 @@ echo -e "${BLUE}============================================================${NC
 echo ""
 
 # 서비스 레포 정보
-declare -A SERVICES=(
-    ["airflow"]="stockelper-airflow"
-    ["fe"]="stockelper-fe"
-    ["kg"]="stockelper-kg"
-    ["llm"]="stockelper-llm"
-    ["news-crawler"]="stockelper-news-crawler"
+# - macOS 기본 /bin/bash(3.2)는 associative array(declare -A)를 지원하지 않음
+# - 따라서 bash 3.x 호환을 위해 "service:repo" 쌍 리스트로 관리
+SERVICES=(
+    "airflow:stockelper-airflow"
+    "backtesting:stockelper-backtesting"
+    "fe:stockelper-fe"
+    "kg:stockelper-kg"
+    "llm:stockelper-llm"
+    "news-crawler:stockelper-news-crawler"
+    "portfolio:stockelper-portfolio"
 )
 
 # sources 디렉터리 생성
@@ -54,8 +58,9 @@ echo ""
 success_count=0
 fail_count=0
 
-for service in "${!SERVICES[@]}"; do
-    repo="${SERVICES[$service]}"
+for entry in "${SERVICES[@]}"; do
+    service="${entry%%:*}"
+    repo="${entry#*:}"
     repo_path="$PARENT_DIR/$repo"
     link_path="$SOURCES_DIR/$service"
     
@@ -91,11 +96,12 @@ if [ $fail_count -gt 0 ]; then
     echo -e "${YELLOW}💡 누락된 레포를 clone하려면:${NC}"
     echo ""
     echo "  cd $PARENT_DIR"
-    for service in "${!SERVICES[@]}"; do
-        repo="${SERVICES[$service]}"
+    for entry in "${SERVICES[@]}"; do
+        service="${entry%%:*}"
+        repo="${entry#*:}"
         repo_path="$PARENT_DIR/$repo"
         if [ ! -d "$repo_path" ]; then
-            if [ "$service" == "news-crawler" ]; then
+            if [ "$service" = "news-crawler" ]; then
                 echo -e "  git clone git@github.com:YOUR_ORG/$repo.git  ${RED}(🔒 Private)${NC}"
             else
                 echo "  git clone https://github.com/YOUR_ORG/$repo.git"

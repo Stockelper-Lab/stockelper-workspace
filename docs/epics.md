@@ -555,47 +555,63 @@ Users see rich visualizations of event patterns and historical matches; system a
 
 ---
 
-#### Story 1.1b: DART Disclosure Event Extraction with Sentiment Scoring
+#### Story 1.1b: DART Disclosure Collection using 36 Major Report Type APIs (Updated 2026-01-03)
 
 **As a** user
-**I want** the system to extract events from DART disclosure data with sentiment analysis
-**So that** I receive comprehensive event intelligence from both news and official disclosures
+**I want** the system to collect DART disclosures using 36 structured major report type APIs
+**So that** I receive high-quality structured event data for comprehensive event intelligence
 
 **Acceptance Criteria:**
 
-**Given** DART disclosure data collected and stored
-**When** the DART event extraction pipeline executes
+**Given** AI-sector universe stocks defined in template
+**When** the DART disclosure collection pipeline executes daily
 **Then** the following conditions are met:
 
-**DART Data Collection:**
-- Integrate DART disclosure data collection (reference code provided separately) (FR2)
-- Store unstructured DART disclosure text for event extraction
+**DART Data Collection (FR126, FR127):**
+- Collect 36 major report types using dedicated DART API endpoints per type (FR126)
+- Collection based on universe template: `modules/dart_disclosure/universe.ai-sector.template.json`
+- 8 categories, 36 total report types:
+  1. 기업상태 (Company Status): 5 types - 부도발생, 영업정지, 회생절차, 해산사유, 풋백옵션
+  2. 증자감자 (Capital Changes): 4 types - 유상증자, 무상증자, 유무상증자, 감자
+  3. 채권은행 (Creditor Bank): 2 types - 관리절차 개시/중단
+  4. 소송 (Litigation): 1 type - 소송등 제기
+  5. 해외상장 (Overseas Listing): 4 types - 상장/폐지 결정 및 실행
+  6. 사채발행 (Bond Issuance): 4 types - 전환사채, 신주인수권부사채, 교환사채, 조건부자본증권
+  7. 자기주식 (Treasury Stock): 4 types - 취득/처분 결정 및 신탁계약
+  8. 영업/자산양수도 (Transfer): 4+ types - 영업/자산 양수도 결정
+- Store structured data in **Local PostgreSQL** (36 dedicated tables, one per report type) (FR127)
+- Each table has common fields (rcept_no, corp_code, stock_code, rcept_dt) plus report-specific fields
+- Daily schedule at 8:00 AM KST aligned with DART disclosure times
+- Rate limiting: Max 5 requests/sec to respect DART API limits
+- Deduplication by rcept_no (receipt number) to prevent duplicates
 
-**Event Extraction:**
-- Extract financial events from DART disclosures using distinct DART-specific prompts (FR2, FR2a)
+**Event Extraction (Post-collection):**
+- Extract financial events from structured DART data using LLM (FR2, FR2a)
 - Extract sentiment score (-1 to 1 range) for each DART event (FR2)
 - Assign source attribute "DART" to all extracted events (FR2b)
 - For dates with no events extracted, standardize sentiment score to 0 (FR2c)
-- Classify events into 7 major DART categories (FR2d):
-  1. Capital Changes (유상증자, 제3자배정, CB/BW, 자기주식, 감자)
-  2. M&A & Governance (주식양수도, 합병, 분할, 최대주주변경, 경영권변경)
-  3. Financial (영업실적, 손익구조변경, 회생절차, 부도)
-  4. Business Operations (신규사업, 계약체결, 공장가동)
-  5. Dividends (현금배당, 분기배당)
-  6. Legal (소송, 횡령/배임)
-  7. Other (전환청구, 상장폐지, 공시해명)
-- Extract event context: amount, market cap ratio, purpose, timing (장중 vs 장마감) (FR2e)
-- Reference DART event ontology: `docs/references/DART(main events).md`
+- Classify events into 7 major DART categories matching the 8 collection categories (FR2d)
+- Extract event context from structured fields: amount, market cap ratio, purpose, timing (FR2e)
+- Reference implementation: `docs/references/DART(modified events).md` (민우 2026-01-03)
 
 **Database changes:**
-- Neo4j: Add `sentiment` float property (-1 to 1) and `source` string property ("DART") to Event nodes
-- Neo4j: Add `event_context` JSON property with: {amount, market_cap_ratio, purpose, timing}
+- **Local PostgreSQL**: 36 new tables (dart_piicDecsn, dart_dfOcr, etc.) with structured schemas
+- **Neo4j**: Add `sentiment` float property (-1 to 1) and `source` string property ("DART") to Event nodes
+- **Neo4j**: Add `event_context` JSON property with: {amount, market_cap_ratio, purpose, timing}
+- **Neo4j**: Document nodes linked to Event nodes via EXTRACTED_FROM relationship
 
 **Files affected:**
-- `/stockelper-airflow/dags/dart_event_extraction_dag.py` (new DAG)
-- `/stockelper-kg/src/stockelper_kg/dart/` (new module, reference code provided)
+- `/stockelper-kg/modules/dart_disclosure/universe.ai-sector.template.json` (new - universe definition)
+- `/stockelper-kg/src/stockelper_kg/collectors/dart_major_reports.py` (new - 36-type collector)
+- `/stockelper-kg/migrations/001_create_dart_disclosure_tables.sql` (new - 36 table schemas)
+- `/stockelper-airflow/dags/dart_disclosure_collection_dag.py` (new DAG - daily 8AM collection)
+- `/stockelper-kg/src/stockelper_kg/extractors/dart_event_extractor.py` (new - event extraction from structured data)
 - `/stockelper-kg/src/stockelper_kg/prompts/dart_event_extraction.py` (DART-specific prompts)
-- `/stockelper-kg/src/stockelper_kg/ontology/dart_events.py` (7-category ontology)
+
+**Implementation Reference:**
+- Complete architecture: `docs/architecture.md` Lines 232-377
+- Implementation guide: `docs/CURSOR-PROMPT-DART-36-TYPE-IMPLEMENTATION.md`
+- Reference code: `docs/references/DART(modified events).md` (민우 2026-01-03)
 
 ---
 
@@ -718,6 +734,68 @@ Users see rich visualizations of event patterns and historical matches; system a
 **Files affected:**
 - `/stockelper-fe/src/components/chat/suggested-queries.tsx` (new component)
 - `/stockelper-fe/src/app/api/chat/suggestions/route.ts` (new API endpoint)
+
+---
+
+#### Story 1.8: Daily Stock Price Data Collection (NEW - Added 2026-01-03)
+
+**As a** backtesting system
+**I want** daily stock price data for all universe stocks collected automatically
+**So that** backtesting can calculate historical returns accurately
+
+**Acceptance Criteria:**
+
+**Given** AI-sector universe stocks defined in template
+**When** the daily price collection pipeline executes
+**Then** the following conditions are met:
+
+**Price Data Collection (FR131):**
+- Collect daily OHLCV (Open, High, Low, Close, Volume) data for all universe stocks (FR131)
+- Data source: KIS OpenAPI or similar Korean stock market data provider
+- Collection based on same universe template: `modules/dart_disclosure/universe.ai-sector.template.json`
+- Daily schedule: After market close (4:00 PM KST, weekdays only)
+- Store in **Local PostgreSQL** table `daily_stock_prices`
+- Include fields: stock_code, trade_date, open_price, high_price, low_price, close_price, volume, market_cap
+- Deduplication by (stock_code, trade_date) composite primary key
+- Rate limiting: Max 5 requests/sec to respect API limits
+- Historical retention: Keep all historical data (no cleanup policy)
+
+**Data Quality:**
+- Validate all required fields populated before storage
+- Handle missing data gracefully (log warning, continue collection)
+- Check for data anomalies (e.g., zero volume, extreme price changes)
+- Retry failed requests up to 3 times with exponential backoff
+
+**Database changes:**
+- **Local PostgreSQL**: New table `daily_stock_prices` with schema:
+  ```sql
+  CREATE TABLE daily_stock_prices (
+      stock_code VARCHAR(6) NOT NULL,
+      trade_date DATE NOT NULL,
+      open_price DECIMAL(12,2),
+      high_price DECIMAL(12,2),
+      low_price DECIMAL(12,2),
+      close_price DECIMAL(12,2),
+      volume BIGINT,
+      market_cap DECIMAL(20,2),
+      created_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (stock_code, trade_date)
+  );
+  CREATE INDEX idx_stock_date ON daily_stock_prices(stock_code, trade_date DESC);
+  ```
+
+**Files affected:**
+- `/stockelper-airflow/dags/daily_price_collection_dag.py` (new DAG)
+- `/stockelper-kg/src/stockelper_kg/collectors/daily_price_collector.py` (new - price data collector)
+- `/stockelper-kg/migrations/002_create_daily_price_table.sql` (new - table schema)
+
+**Integration:**
+- Backtesting service reads from this table for historical price data
+- Portfolio recommendation service may use for performance calculations
+- Event intelligence may correlate events with price movements
+
+**Implementation Reference:**
+- Complete architecture: `docs/architecture.md` Lines 381-451
 
 ---
 
@@ -878,18 +956,28 @@ Users manage portfolios through dedicated UI and receive daily personalized reco
 - Page accessible via GNB navigation and notification click
 - Empty portfolio shows message: "Add stocks to your portfolio to receive recommendations"
 
-**Database changes:**
+**Database changes (Updated 2026-01-03):**
 - PostgreSQL on AWS t3.medium: Create `portfolio_recommendations` table with columns:
-  - id (UUID)
+  - id (SERIAL PRIMARY KEY)
+  - **job_id (UUID NOT NULL UNIQUE)** (NEW - FR129) - Unique job identifier for tracking
   - user_id (FK)
   - content (TEXT - Markdown)
-  - image_base64 (TEXT nullable)
-  - status (ENUM: PENDING, IN_PROGRESS, COMPLETED, FAILED)
-  - created_at (TIMESTAMP)
-  - updated_at (TIMESTAMP)
-  - written_at (TIMESTAMP nullable)
-  - completed_at (TIMESTAMP nullable)
+  - image_base64 (TEXT nullable) - Optional chart/visualization
+  - **status (VARCHAR(20) CHECK constraint)** (UPDATED - FR130) - Korean enum: '작업 전', '처리 중', '완료', '실패'
+  - created_at (TIMESTAMP DEFAULT NOW()) - Request initiated
+  - updated_at (TIMESTAMP DEFAULT NOW()) - Last modification
+  - written_at (TIMESTAMP nullable) - Result written
+  - completed_at (TIMESTAMP nullable) - Job finished
+- **Indexes:**
+  - CREATE INDEX idx_portfolio_user ON portfolio_recommendations(user_id, created_at DESC)
+  - CREATE INDEX idx_portfolio_job ON portfolio_recommendations(job_id)
+  - CREATE INDEX idx_portfolio_status ON portfolio_recommendations(status) WHERE status IN ('작업 전', '처리 중')
 - Enable Supabase Realtime on `portfolio_recommendations` table
+- **Korean Status Enum Values (FR130):**
+  - '작업 전' (Before Processing) - Initial state
+  - '처리 중' (In Progress) - Portfolio generation running
+  - '완료' (Completed) - Recommendation ready
+  - '실패' (Failed) - Error during generation
 
 **Files affected:**
 - `/stockelper-fe/src/app/(has-layout)/recommendations/page.tsx` (updated with table/list + Markdown viewer)
@@ -1001,22 +1089,40 @@ Users validate investment strategies through historical backtesting with Sharpe 
 - Backtesting container fully owns data generation, status transitions, database writes (FR119)
 - Frontend only subscribes to Supabase Realtime and renders UI (FR120)
 
-**Database changes:**
-- PostgreSQL on AWS t3.medium: Create `backtest_jobs` table with columns:
-  - id (UUID)
+**Database changes (Updated 2026-01-03):**
+- PostgreSQL on AWS t3.medium: Create `backtest_results` table with columns:
+  - id (UUID - SERIAL PRIMARY KEY)
+  - **job_id (UUID - UNIQUE)** (NEW - FR128) - Unique job identifier for tracking
   - user_id (FK)
   - universe (JSONB - stock list)
   - strategy (VARCHAR - strategy name)
+  - **strategy_description (TEXT)** (NEW) - User's backtesting strategy in natural language
+  - **universe_filter (TEXT)** (NEW) - Applied universe filter (e.g., "AI sector")
   - content (TEXT - Markdown report, nullable)
-  - image_base64 (TEXT nullable)
-  - status (ENUM: PENDING, IN_PROGRESS, COMPLETED, FAILED)
+  - image_base64 (TEXT nullable) - Optional performance chart
+  - **status (VARCHAR(20) CHECK constraint)** (UPDATED - FR130) - Korean enum: '작업 전', '처리 중', '완료', '실패'
   - error_message (TEXT nullable)
   - retry_count (INT default 0)
-  - created_at (TIMESTAMP)
-  - updated_at (TIMESTAMP)
+  - **execution_time_seconds (INT)** (NEW) - Actual execution duration (5min-1hr range expected)
+  - created_at (TIMESTAMP) - Request initiated
+  - updated_at (TIMESTAMP) - Last modification
+  - **written_at (TIMESTAMP nullable)** (NEW) - Result written
   - started_at (TIMESTAMP nullable)
-  - completed_at (TIMESTAMP nullable)
-- Enable Supabase Realtime on `backtest_jobs` table
+  - completed_at (TIMESTAMP nullable) - Job finished
+- **Indexes:**
+  - CREATE INDEX idx_backtest_user ON backtest_results(user_id, created_at DESC)
+  - CREATE INDEX idx_backtest_job ON backtest_results(job_id)
+  - CREATE INDEX idx_backtest_status ON backtest_results(status) WHERE status IN ('작업 전', '처리 중')
+- Enable Supabase Realtime on `backtest_results` table
+- **Korean Status Enum Values (FR130):**
+  - '작업 전' (Before Processing) - Initial state
+  - '처리 중' (In Progress) - Backtesting running (5min-1hr expected)
+  - '완료' (Completed) - Results ready for viewing
+  - '실패' (Failed) - Error during backtesting
+- **Performance Constraints (from 2026-01-03 meeting):**
+  - Simple 1-year backtest: ~5 minutes execution time
+  - Complex multi-indicator strategy: Up to 1 hour execution time
+  - Async processing required with browser notifications on completion
 
 **Files affected:**
 - `/stockelper-llm/src/api/backtesting.py` (LLM parameter extraction logic)

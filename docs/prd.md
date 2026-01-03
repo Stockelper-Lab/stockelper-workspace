@@ -1306,6 +1306,15 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 - **FR124:** Each backtesting job row shows: stock name, strategy, status, creation timestamp
 - **FR125:** Backtesting Markdown reports include charts, tables, and performance metrics
 
+### Data Collection & Storage (Added 2026-01-03)
+
+- **FR126:** System can collect DART disclosures using 36 major report type APIs with structured field extraction
+- **FR127:** System can store DART disclosure data in local PostgreSQL with dedicated schemas per report type
+- **FR128:** Backtesting jobs include unique job_id (UUID) for tracking and reference across system
+- **FR129:** Portfolio recommendation jobs include unique job_id (UUID) for tracking and reference across system
+- **FR130:** Status values use Korean enum: 작업 전 (Before Processing), 처리 중 (In Progress), 완료 (Completed), 실패 (Failed)
+- **FR131:** System can collect daily stock price data (OHLCV) for all universe stocks via scheduled pipeline
+
 ## Non-Functional Requirements
 
 ### Performance
