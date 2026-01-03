@@ -422,860 +422,445 @@ column_mapping = {
 
 ---
 
-## B) Filing-Document-Based Event Extraction Status
+## B) DART Disclosure Collection Status - 36 Major Report Types
 
-### ❌ **Status: NOT IMPLEMENTED**
+### 🔄 **Status: ARCHITECTURE REVISED (2026-01-03)**
 
-Despite comprehensive planning in documentation and ontology definitions, **filing-document-based event extraction is NOT implemented** in the current codebase.
+**Previous Approach (NOT IMPLEMENTED):**
+- Generic `list()` → `document()` → LLM event extraction pipeline
+- Unstructured text parsing from disclosure documents
+- Planned but never built
 
----
-
-### Evidence of Planning (Documentation)
-
-#### 1. **Ontology Definition** (`stockelper-kg/graph/ontology.py`)
-
-**Document Node Definition (Lines 212-254):**
-```python
-NodeDefinition(
-    name="Document",
-    description="원천 데이터(공시, 뉴스 기사)",
-    primary_keys=(("rcept_no",), ("document_id",), ("url",), ("title",)),
-    properties=(
-        NodeProperty("공시번호", "rcept_no", "OpenDART list.json",
-                     'dart.list_filings(cc,"2025-01-01","2025-12-31","B").iloc[0]["rcept_no"]'),
-        NodeProperty("제목", "report_nm", "OpenDART list.json",
-                     'df.iloc[0]["report_nm"]'),
-        NodeProperty("게시일", "rcept_dt", "OpenDART list.json",
-                     'df.iloc[0]["rcept_dt"]'),
-        NodeProperty("URL", "url", "DART viewer / 뉴스 링크",
-                     "dart.document_url(rcept_no)"),
-        NodeProperty("본문", "body", "OpenDART document.xml / 기사 전문",
-                     "dart.document_text(rcept_no)"),
-    ),
-)
-```
-
-**Event Node Definition (Lines 179-210):**
-```python
-NodeDefinition(
-    name="Event",
-    description="기업의 사건(공시, 뉴스)",
-    primary_keys=(("event_id",),),
-    properties=(
-        NodeProperty("사건ID", "event_id", "내부", 'f"EVT_{rcept_no}"'),
-        NodeProperty("유형(L1)", "pblntf_ty", "OpenDART list.json",
-                     'row.get("pblntf_ty", "B")'),
-        NodeProperty("유형(L2)", "pblntf_detail_ty", "OpenDART list.json",
-                     'row.get("pblntf_detail_ty", row.get("report_nm"))'),
-        NodeProperty("일자", "reported_at", "OpenDART list.json",
-                     'row["rcept_dt"]'),
-    ),
-)
-```
-
-**18 Event Type Definitions (Lines 764-904):**
-- SUPPLY_CAPACITY_CHANGE (공장 건설/증설)
-- SUPPLY_HALT (라인/사업장 가동중단)
-- DEMAND_SALES_CONTRACT (판매/공급계약)
-- REVENUE_EARNINGS (실적 발표)
-- EFFICIENCY_AUTOMATION (자동화/DX 투자)
-- STRATEGY_MNA (M&A/인수합병)
-- STRATEGY_SPINOFF (분할·분할합병)
-- STRATEGY_OVERSEAS (해외 투자/법인 설립)
-- STRATEGY_PARTNERSHIP (전략적 제휴/MOU)
-- TECH_NEW_PRODUCT (신제품/신기술 출시)
-- WORKFORCE_EVENT (인력 감축/채용/파업)
-- LEGAL_LITIGATION (소송/규제 제재)
-- CRISIS_EVENT (화재/횡령/사이버공격)
-- PRODUCT_RECALL (리콜/판매중단)
-- POLICY_IMPACT (정부 정책/규제 변화)
-- VIRAL_EVENT (테마주/밈)
-- OWNERSHIP_CHANGE (최대주주 변경/지분 매각)
-- REGULATORY_APPROVAL (FDA 승인/특허 등록)
-- OTHER (기타)
+**New Approach (Updated 2026-01-03 - Based on 민우 work):**
+- **36 structured major report type API endpoints**
+- Dedicated DART API per report type with structured fields
+- Direct data extraction without LLM parsing
+- **Local PostgreSQL storage** (NOT remote AWS)
 
 ---
 
-#### 2. **DART Event Documentation** (`docs/references/DART(main events).md`)
+### 36 Major Report Types - Complete Catalog
 
-Comprehensive documentation of DART disclosure events with real-world examples:
+**Data Source:** DART Open API (OpenDartReader library)
+**Reference:** `docs/references/DART(modified events).md` (민우 2026-01-03 work)
+**Storage:** Local PostgreSQL (36 separate tables, one per report type)
 
-**7 Major Categories:**
-1. **자본 변동 관련** (Capital Changes)
-   - 유상증자결정 (Paid-in capital increase)
-   - 제3자배정 유상증자 (Third-party allocation)
-   - CB/BW 발행 (Convertible/bond warrants)
-   - 자기주식 취득/소각 (Treasury stock acquisition/retirement)
-   - 감자결정 (Capital reduction)
+#### Category 1: 기업상태 (Company Status) - 5 Types
 
-2. **M&A 및 지배구조** (M&A & Governance)
-   - 주식양수도계약 (Share transfer)
-   - 합병/분할 (Merger/spinoff)
-   - 최대주주 변경 (Major shareholder change)
-   - 경영권 변경 (Management change)
+| Report Type | API Code | Korean Name | Description |
+|-------------|----------|-------------|-------------|
+| AST_INHTRF_ETC_PTBK_OPT | astInhtrfEtcPtbkOpt | 자산양수도(기타)_풋백옵션 | Put-back option on asset transfer |
+| DF_OCR | dfOcr | 부도발생 | Default occurrence |
+| BSN_SP | bsnSp | 영업정지 | Business suspension |
+| RVVPRPD_APSTRT_APLFN | rvvprpdApstrtAplfn | 회생절차_개시신청 | Rehabilitation procedure application |
+| DSLN_RSN_OCR | dslnRsnOcr | 해산사유_발생 | Dissolution reason occurrence |
 
-3. **재무 관련** (Financial)
-   - 영업실적 (Operating results)
-   - 손익구조 변경 (Profit structure change)
-   - 회생절차/부도 (Bankruptcy/default)
+**Common Fields:**
+- corp_code (VARCHAR) - 8-digit company code
+- stock_code (VARCHAR) - 6-digit stock code
+- corp_name (VARCHAR) - Company name
+- rcept_no (VARCHAR PRIMARY KEY) - Receipt number
+- rcept_dt (DATE) - Receipt date
 
-4. **영업 및 사업** (Business Operations)
-   - 신규사업 진출 (New business entry)
-   - 타법인 계약 체결 (Contract signing)
-   - 공장 가동중단/재가동 (Plant halt/restart)
-
-5. **배당** (Dividends)
-   - 현금/현물배당 (Cash/stock dividends)
-
-6. **소송 및 분쟁** (Legal)
-   - 소송 제기/판결 (Litigation)
-   - 횡령/배임 (Embezzlement/breach of trust)
-
-7. **기타** (Other)
-   - 상장폐지 (Delisting)
-   - 풍문 해명 (Rumor clarification)
-
-**Real Examples with Price Impact:**
-- CJ CGV 유상증자 (2023.06): 주가 -30%
-- SK이노베이션 유상증자 (2023.06): 주가 -6.08%
-- HMM 자사주 소각 (2025.08): 주가 +10%
+**Report-Specific Examples (dfOcr - Default):**
+- df_dt (DATE) - Default date
+- df_am (DECIMAL) - Default amount
+- df_rsn (TEXT) - Default reason
 
 ---
 
-#### 3. **Data Collection Planning** (`docs/references/knowledge-graph-data-collection-planning.md`)
+#### Category 2: 증자감자 (Capital Changes) - 4 Types
 
-**Planned DART API Methods (Lines 20-82):**
+| Report Type | API Code | Korean Name | Description |
+|-------------|----------|-------------|-------------|
+| PIIC_DECSN | piicDecsn | 유상증자_결정 | Paid-in capital increase decision |
+| BDID_DECSN | bdidDecsn | 무상증자_결정 | Bonus issue decision |
+| PIIC_BDID_DECSN | piicBdidDecsn | 유무상증자_결정 | Mixed capital increase decision |
+| DSRS_DECSN | dsrsDecsn | 감자_결정 | Capital reduction decision |
 
-| Entity | Property | Planned API Method | Status |
-|--------|----------|-------------------|--------|
-| Document | rcept_no | `dart.list_filings(cc, start, end, "B")` | ❌ Not Used |
-| Document | report_nm | `df.iloc[0]["report_nm"]` | ❌ Not Used |
-| Document | rcept_dt | `df.iloc[0]["rcept_dt"]` | ❌ Not Used |
-| Document | url | `dart.document_url(rcept_no)` | ❌ Not Used |
-| Document | body | `dart.document_text(rcept_no)` | ❌ Not Used |
+**Report-Specific Fields (piicDecsn - Paid-in increase):**
+- nstk_astock_co (BIGINT) - Number of new stocks allocated
+- nstk_astock_estmtamt (BIGINT) - Estimated amount
+- nstk_astock_int (TEXT) - Allocation intent
+- fdpp_fclt_atrdsqp_rsn (TEXT) - Reason for facility acquisition
 
-**Note:** These methods exist in OpenDartReader library but are NOT called anywhere in the Stockelper codebase.
+**Example Schema:**
+```sql
+CREATE TABLE dart_piic_decsn (
+    rcept_no VARCHAR PRIMARY KEY,
+    corp_code VARCHAR NOT NULL,
+    stock_code VARCHAR,
+    corp_name VARCHAR,
+    rcept_dt DATE NOT NULL,
+    nstk_astock_co BIGINT,  -- New stock count
+    nstk_astock_estmtamt BIGINT,  -- Estimated amount
+    nstk_astock_int TEXT,  -- Allocation intent
+    fdpp_fclt_atrdsqp_rsn TEXT,  -- Reason
+    created_at TIMESTAMP DEFAULT NOW()
+);
 
----
-
-### Missing Implementation Components
-
-#### 1. **No Document Collection Pipeline**
-
-**Expected Flow (not implemented):**
-```
-Company (corp_code)
-    ↓
-dart.list_filings(corp_code, start_date, end_date, "B")  # ❌ Not called
-    ↓
-rcept_no (disclosure ID)
-    ↓
-dart.document(rcept_no) or dart.document_text(rcept_no)  # ❌ Not called
-    ↓
-Document body (XML/text)
-    ↓
-LLM-based event extraction  # ❌ Not implemented
-    ↓
-Event nodes in Neo4j  # ❌ Not stored
-```
-
-**Current Reality:**
-- Only financial statements (`finstate`, `finstate_all`) are collected
-- No document retrieval or parsing
-- No event extraction from disclosure text
-- Event nodes defined in ontology but never created
-
----
-
-#### 2. **No Event Extraction Logic**
-
-**Missing Components:**
-- LLM prompt engineering for event extraction
-- Event type classification logic
-- Sentiment scoring for DART events
-- Event-Document relationship creation
-- Event-Company relationship creation
-
-**From Epic 1.1b Documentation:**
-```markdown
-Story 1.1b: DART Disclosure Event Extraction with Sentiment Scoring
-
-Acceptance Criteria:
-- Extract financial events from DART disclosures using distinct DART-specific prompts
-- Extract sentiment score (-1 to 1 range) for each DART event
-- Assign source attribute "DART" to all extracted events
-- Classify events into 7 major DART categories
-- Extract event context: amount, market cap ratio, purpose, timing
-
-Files affected:
-- /stockelper-airflow/dags/dart_event_extraction_dag.py (new DAG)  # ❌ Does not exist
-- /stockelper-kg/src/stockelper_kg/dart/ (new module)              # ❌ Does not exist
-- /stockelper-kg/prompts/dart_event_extraction.py                  # ❌ Does not exist
-- /stockelper-kg/ontology/dart_events.py                           # ❌ Does not exist
+CREATE INDEX idx_piic_corp ON dart_piic_decsn(corp_code, rcept_dt DESC);
+CREATE INDEX idx_piic_stock ON dart_piic_decsn(stock_code, rcept_dt DESC);
 ```
 
 ---
 
-#### 3. **No Airflow DAG for DART Event Collection**
+#### Category 3: 채권은행 (Creditor Bank) - 2 Types
 
-**Expected DAG (not implemented):**
-```python
-# /stockelper-airflow/dags/dart_event_extraction_dag.py  ❌ DOES NOT EXIST
+| Report Type | API Code | Korean Name | Description |
+|-------------|----------|-------------|-------------|
+| CRBNMNGPRCD_STR | crbnmngprcdStr | 채권은행_관리절차_개시 | Creditor bank management procedure start |
+| CRBNMNGPRCD_DSCD | crbnmngprcdDscd | 채권은행_관리절차_중단 | Creditor bank management procedure suspension |
 
-from airflow import DAG
-from datetime import datetime
+**Report-Specific Fields:**
+- mngprcd_str_dt (DATE) - Management procedure start date
+- mngprcd_dscd_dt (DATE) - Management procedure suspension date
 
-dag = DAG(
-    'dart_event_extraction',
-    start_date=datetime(2025, 1, 1),
-    schedule_interval='0 */3 * * *',  # Every 3 hours
-)
+---
 
-# Expected tasks:
-# 1. Fetch disclosure list for AI-sector stocks
-# 2. Retrieve document bodies for new disclosures
-# 3. Extract events using LLM (gpt-5.1)
-# 4. Store in Neo4j with sentiment scores
-# 5. Create Document/Event nodes and relationships
+#### Category 4: 소송 (Litigation) - 1 Type
+
+| Report Type | API Code | Korean Name | Description |
+|-------------|----------|-------------|-------------|
+| LST_FR | lstFr | 소송등_제기 | Litigation filing |
+
+**Report-Specific Fields:**
+- lst_knd (VARCHAR) - Litigation kind
+- lst_bdtamt (DECIMAL) - Litigation amount
+- lst_fltm (TEXT) - Litigation details/content
+
+---
+
+#### Category 5: 해외상장 (Overseas Listing) - 4 Types
+
+| Report Type | API Code | Korean Name | Description |
+|-------------|----------|-------------|-------------|
+| OVR_SEC_MKT_LSTG_DECSN | ovrSecMktLstgDecsn | 해외증권시장_상장_결정 | Overseas listing decision |
+| OVR_SEC_MKT_DLST_DECSN | ovrSecMktDlstDecsn | 해외증권시장_상장폐지_결정 | Overseas delisting decision |
+| OVR_SEC_MKT_LSTG | ovrSecMktLstg | 해외증권시장_상장 | Overseas listing |
+| OVR_SEC_MKT_DLST | ovrSecMktDlst | 해외증권시장_상장폐지 | Overseas delisting |
+
+**Report-Specific Fields:**
+- ovr_mkt_lstg_exch (VARCHAR) - Exchange name (NASDAQ, NYSE, etc.)
+- ovr_mkt_lstg_dt (DATE) - Listing date
+- ovr_mkt_dlst_dt (DATE) - Delisting date
+
+---
+
+#### Category 6: 사채발행 (Bond Issuance) - 4 Types
+
+| Report Type | API Code | Korean Name | Description |
+|-------------|----------|-------------|-------------|
+| CVSBNISSN_DECSN | cvsbnissnDecsn | 전환사채권_발행결정 | Convertible bond issuance decision |
+| BDWTISSN_DECSN | bdwtissnDecsn | 신주인수권부사채권_발행결정 | Bond with warrants issuance decision |
+| EXBD_ISSN_DECSN | exbdIssnDecsn | 교환사채권_발행결정 | Exchangeable bond issuance decision |
+| AMCD_CPBDISSN_DECSN | amcdCpbdissnDecsn | 상각형_조건부자본증권_발행결정 | Amortizing conditional capital security issuance decision |
+
+**Report-Specific Fields (cvsbnissnDecsn):**
+- bd_issn_am (DECIMAL) - Bond issuance amount
+- bd_issn_cnt (BIGINT) - Bond issuance count
+- cvprc_dtm_mth (VARCHAR) - Conversion price determination method
+- cvprc (DECIMAL) - Conversion price
+
+---
+
+#### Category 7: 자기주식 (Treasury Stock) - 4 Types
+
+| Report Type | API Code | Korean Name | Description |
+|-------------|----------|-------------|-------------|
+| OG_STOCK_ACQS_DECSN | ogStockAcqsDecsn | 자기주식_취득_결정 | Treasury stock acquisition decision |
+| OG_STOCK_DSPS_DECSN | ogStockDspsDecsn | 자기주식_처분_결정 | Treasury stock disposal decision |
+| OG_STOCK_ACQS_TCNTR_SGNT_DECSN | ogStockAcqsTcntrSgntDecsn | 자기주식취득_신탁계약_체결_결정 | Treasury stock acquisition trust contract decision |
+| OG_STOCK_ACQS_TCNTR_SGNT_CNLT_DECSN | ogStockAcqsTcntrSgntCnltDecsn | 자기주식취득_신탁계약_해지_결정 | Treasury stock acquisition trust contract termination decision |
+
+**Report-Specific Fields:**
+- og_stock_acqs_mth (VARCHAR) - Acquisition method
+- og_stock_acqs_cnt (BIGINT) - Acquisition count
+- og_stock_dsps_cnt (BIGINT) - Disposal count
+- og_stock_acqs_am (DECIMAL) - Acquisition amount
+
+---
+
+#### Category 8: 영업/자산양수도 (Business/Asset Transfer) - 4+ Types
+
+| Report Type | API Code | Korean Name | Description |
+|-------------|----------|-------------|-------------|
+| BSN_ACQS_DECSN | bsnAcqsDecsn | 영업양수_결정 | Business acquisition decision |
+| BSN_TRNF_DECSN | bsnTrnfDecsn | 영업양도_결정 | Business transfer decision |
+| TNR_ASSETS_ACQS_DECSN | tnrAssetsAcqsDecsn | 유형자산_양수_결정 | Tangible asset acquisition decision |
+| TNR_ASSETS_TRNF_DECSN | tnrAssetsTrnfDecsn | 유형자산_양도_결정 | Tangible asset transfer decision |
+
+**Report-Specific Fields:**
+- trnf_target (TEXT) - Transfer target description
+- trnf_am (DECIMAL) - Transfer amount
+- trnf_rsn (TEXT) - Transfer reason
+
+---
+
+### Collection Pipeline Architecture
+
+**Data Flow:**
+
+```
+1. Universe Loading
+   ├─ Read: modules/dart_disclosure/universe.ai-sector.template.json
+   └─ Extract: List of corp_codes (AI sector stocks)
+
+2. Parallel Collection (Per corp_code)
+   ├─ For each corp_code:
+   │  ├─ For each of 36 major report types:
+   │  │  ├─ API Call: dart.major_report(corp_code, report_type)
+   │  │  ├─ Structured fields returned per type
+   │  │  └─ Store: Local PostgreSQL (type-specific table)
+   │  └─ Rate limiting: 5 requests/sec max
+   └─ Deduplication: By rcept_no (receipt number)
+
+3. Event Extraction (Post-collection)
+   ├─ Read: Structured data from PostgreSQL tables
+   ├─ LLM processing: Extract sentiment + event classification
+   └─ Store: Neo4j (Event nodes, Document nodes)
+
+4. Pattern Matching & Notifications
+   ├─ Query: Neo4j event graph
+   ├─ Match: Similar historical events
+   └─ Notify: Users with matching interests
 ```
 
-**Current Reality:**
-- No Airflow DAG for DART document collection
-- No scheduled event extraction
-- Only financial statements collected via existing patterns
+**Storage Architecture:**
+
+| Data Type | Storage | Schema |
+|-----------|---------|--------|
+| **Raw DART Disclosures** | Local PostgreSQL | 36 tables (one per report type) |
+| **Event Extraction Results** | Local PostgreSQL | `dart_events` table (sentiment, classification) |
+| **Graph Relationships** | Neo4j | `:Document` nodes, `:Event` nodes, `EXTRACTED_FROM` relationships |
+| **Backtesting Results** | Remote PostgreSQL (`${POSTGRES_HOST}`) | `backtest_results` table |
+| **Portfolio Recommendations** | Remote PostgreSQL (`${POSTGRES_HOST}`) | `portfolio_recommendations` table |
 
 ---
 
-### Gap Analysis
+### Airflow DAG Specification
 
-| Component | Planned | Implemented | Gap |
-|-----------|---------|-------------|-----|
-| **DART API Methods** |
-| `company()` | ✅ | ✅ | None |
-| `find_corp_code()` | ✅ | ✅ | None |
-| `finstate()` | ✅ | ✅ | None |
-| `finstate_all()` | ✅ | ✅ | None |
-| `list()` / `list_filings()` | ✅ | ❌ | **Missing** |
-| `document()` / `document_text()` | ✅ | ❌ | **Missing** |
-| `document_url()` | ✅ | ❌ | **Missing** |
-| **Data Models** |
-| Company node | ✅ | ✅ | None |
-| FinancialStatements node | ✅ | ✅ | None |
-| Document node | ✅ | ❌ | **Missing** |
-| Event node | ✅ | ❌ | **Missing** |
-| **Workflows** |
-| Financial statement collection | ✅ | ✅ | None |
-| DART document collection | ✅ | ❌ | **Missing** |
-| Event extraction from documents | ✅ | ❌ | **Missing** |
-| Sentiment scoring | ✅ | ❌ | **Missing** |
-| Event-Document linking | ✅ | ❌ | **Missing** |
+**DAG Name:** `dag_dart_disclosure_daily`
+**Schedule:** Daily @ 8:00 AM KST
+**Owner:** 영상
 
----
-
-### Proposed Implementation Design
-
-#### **Service Boundary Decisions**
-
-Based on existing patterns and BMAD architectural principles:
-
-| Component | Service | Rationale |
-|-----------|---------|-----------|
-| **DART Document Collection** | `stockelper-kg` | Aligns with existing `collectors/dart.py` pattern |
-| **Event Extraction (LLM)** | `stockelper-llm` | gpt-5.1 event classification requires LLM service |
-| **Orchestration** | `stockelper-airflow` | Scheduled execution, same as news extraction |
-| **Storage** | `stockelper-kg` | Neo4j graph storage, same as other entities |
-
----
-
-#### **Module Structure**
-
-```
-stockelper-kg/
-└── src/stockelper_kg/
-    ├── collectors/
-    │   ├── dart.py                    # ✅ Existing (financial statements)
-    │   └── dart_documents.py          # 🆕 NEW (disclosure documents)
-    ├── extractors/
-    │   └── dart_event_extractor.py    # 🆕 NEW (event extraction logic)
-    └── graph/
-        └── dart_event_builder.py      # 🆕 NEW (Document/Event nodes)
-
-stockelper-llm/
-└── src/
-    ├── prompts/
-    │   └── dart_event_extraction.py   # 🆕 NEW (LLM prompts for events)
-    └── tools/
-        └── dart_event_classifier.py   # 🆕 NEW (LangChain tool)
-
-stockelper-airflow/
-└── dags/
-    └── dart_event_extraction_dag.py   # 🆕 NEW (orchestration DAG)
-```
-
----
-
-#### **Proposed Function Signatures**
-
-**1. Document Collector** (`stockelper-kg/collectors/dart_documents.py`)
+**Tasks:**
 
 ```python
-from typing import List, Dict, Optional
-from datetime import datetime
-import pandas as pd
-from OpenDartReader import OpenDartReader
+# dags/dart_disclosure_collection_dag.py
 
-
-class DartDocumentCollector:
-    """Collects DART disclosure documents for event extraction."""
-
-    def __init__(self, api_key: str):
-        self.dart = OpenDartReader(api_key)
-
-    def fetch_disclosure_list(
-        self,
-        corp_code: str,
-        start_date: str,  # YYYYMMDD
-        end_date: str,    # YYYYMMDD
-        pblntf_ty: str = "B"  # B=정기공시, A=정기공시, C=정정공시
-    ) -> pd.DataFrame:
-        """
-        Fetch list of disclosures for a company within date range.
-
-        Returns DataFrame with columns:
-        - rcept_no (str): Disclosure receipt number
-        - corp_code (str): Company code
-        - corp_name (str): Company name
-        - stock_code (str): Stock code
-        - report_nm (str): Report name/title
-        - rcept_dt (str): Receipt date YYYYMMDD
-        - pblntf_ty (str): Publication type
-        - pblntf_detail_ty (str): Detailed type
-        - corp_cls (str): Corp class (Y/K/N/E)
-        - rm (str): Remarks
-        """
-        df = self.dart.list(corp_code, start_date, end_date, pblntf_ty)
-        return df
-
-    def fetch_document_body(
-        self,
-        rcept_no: str
-    ) -> Optional[str]:
-        """
-        Fetch full document body text for a disclosure.
-
-        Args:
-            rcept_no: Disclosure receipt number
-
-        Returns:
-            str: Document body text (XML converted to text)
-            None: If document unavailable
-        """
-        try:
-            # OpenDartReader provides document() method
-            doc = self.dart.document(rcept_no)
-            return doc
-        except Exception as e:
-            print(f"Failed to fetch document {rcept_no}: {e}")
-            return None
-
-    def get_document_url(self, rcept_no: str) -> str:
-        """Generate DART viewer URL for a disclosure."""
-        return f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}"
-```
-
-**Input/Output Summary:**
-
-| Method | Input | Output |
-|--------|-------|--------|
-| `fetch_disclosure_list()` | corp_code, start_date, end_date | DataFrame (rcept_no, report_nm, rcept_dt, etc.) |
-| `fetch_document_body()` | rcept_no | str (document text) or None |
-| `get_document_url()` | rcept_no | str (DART viewer URL) |
-
----
-
-**2. Event Extractor** (`stockelper-kg/extractors/dart_event_extractor.py`)
-
-```python
-from typing import List, Dict, Optional
-from dataclasses import dataclass
-from enum import Enum
-
-
-class DartEventCategory(Enum):
-    """7 major DART event categories."""
-    CAPITAL_CHANGES = "자본 변동"
-    MNA_GOVERNANCE = "M&A 및 지배구조"
-    FINANCIAL = "재무 관련"
-    BUSINESS_OPS = "영업 및 사업"
-    DIVIDENDS = "배당"
-    LEGAL = "소송 및 분쟁"
-    OTHER = "기타"
-
-
-@dataclass
-class ExtractedEvent:
-    """Structured event extraction result."""
-    event_id: str                    # e.g., "EVT_20250101000001"
-    event_type: str                  # Ontology event type
-    category: DartEventCategory      # 7-category classification
-    sentiment: float                 # -1.0 to 1.0
-    description: str                 # Event description
-    date: str                        # YYYY-MM-DD
-    context: Dict[str, any]          # amount, market_cap_ratio, purpose, timing
-    confidence: float                # Extraction confidence 0-1
-    source: str = "DART"
-
-    def to_neo4j_dict(self) -> Dict:
-        """Convert to Neo4j node properties."""
-        return {
-            "event_id": self.event_id,
-            "event_type": self.event_type,
-            "category": self.category.value,
-            "sentiment": self.sentiment,
-            "description": self.description,
-            "date": self.date,
-            "source": self.source,
-            "confidence": self.confidence,
-            **self.context
-        }
-
-
-class DartEventExtractor:
-    """Extracts events from DART disclosure documents using LLM."""
-
-    def __init__(self, llm_client):
-        """
-        Args:
-            llm_client: LLM service client (gpt-5.1)
-        """
-        self.llm = llm_client
-        self.ontology = load_dart_ontology()  # 18 event types + 7 categories
-
-    def extract_events(
-        self,
-        document_body: str,
-        rcept_no: str,
-        report_nm: str,
-        rcept_dt: str
-    ) -> List[ExtractedEvent]:
-        """
-        Extract structured events from document text.
-
-        Args:
-            document_body: Full disclosure text
-            rcept_no: Disclosure ID
-            report_nm: Report title
-            rcept_dt: Receipt date YYYYMMDD
-
-        Returns:
-            List of ExtractedEvent objects
-        """
-        # Construct LLM prompt with ontology
-        prompt = self._build_extraction_prompt(
-            document_body, report_nm, self.ontology
-        )
-
-        # Call LLM (gpt-5.1)
-        response = self.llm.complete(prompt)
-
-        # Parse structured output
-        events = self._parse_llm_response(response, rcept_no, rcept_dt)
-
-        return events
-
-    def _build_extraction_prompt(
-        self,
-        document_body: str,
-        report_nm: str,
-        ontology: Dict
-    ) -> str:
-        """Build LLM prompt with DART-specific instructions."""
-        # Prompt engineering for DART event extraction
-        # - Include 18 event type definitions
-        # - Include 7 category mappings
-        # - Request sentiment score (-1 to 1)
-        # - Request event context extraction
-        # - Emphasize DART-specific patterns
-        pass
-
-    def _parse_llm_response(
-        self,
-        response: str,
-        rcept_no: str,
-        rcept_dt: str
-    ) -> List[ExtractedEvent]:
-        """Parse LLM JSON output into ExtractedEvent objects."""
-        pass
-
-    def calculate_sentiment(
-        self,
-        event_type: str,
-        event_description: str
-    ) -> float:
-        """
-        Calculate sentiment score for event.
-
-        Uses DART event impact patterns from:
-        docs/references/DART(main events).md
-
-        Returns:
-            float: -1.0 (negative) to 1.0 (positive)
-        """
-        # Sentiment mapping based on DART event patterns
-        # Example:
-        # - 유상증자 → -0.7 (typically negative)
-        # - 자사주 소각 → +0.8 (typically positive)
-        # - 실적 발표 → contextual (depends on consensus)
-        pass
-```
-
-**Input/Output Summary:**
-
-| Method | Input | Output |
-|--------|-------|--------|
-| `extract_events()` | document_body, rcept_no, report_nm, rcept_dt | List[ExtractedEvent] |
-| `calculate_sentiment()` | event_type, event_description | float (-1.0 to 1.0) |
-
----
-
-**3. Graph Builder** (`stockelper-kg/graph/dart_event_builder.py`)
-
-```python
-from typing import List
-from neo4j import GraphDatabase
-from .dart_event_extractor import ExtractedEvent
-
-
-class DartEventGraphBuilder:
-    """Builds Document and Event nodes in Neo4j knowledge graph."""
-
-    def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str):
-        self.driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
-
-    def create_document_node(
-        self,
-        rcept_no: str,
-        report_nm: str,
-        rcept_dt: str,
-        corp_code: str,
-        url: str,
-        body: str
-    ) -> None:
-        """
-        Create Document node in Neo4j.
-
-        Cypher:
-        MERGE (d:Document {rcept_no: $rcept_no})
-        SET d.report_nm = $report_nm,
-            d.rcept_dt = $rcept_dt,
-            d.url = $url,
-            d.body = $body
-        """
-        query = """
-        MERGE (d:Document {rcept_no: $rcept_no})
-        SET d.report_nm = $report_nm,
-            d.rcept_dt = $rcept_dt,
-            d.url = $url,
-            d.body = $body,
-            d.source = 'DART'
-        """
-        with self.driver.session() as session:
-            session.run(query, rcept_no=rcept_no, report_nm=report_nm,
-                       rcept_dt=rcept_dt, url=url, body=body)
-
-    def create_event_node(
-        self,
-        event: ExtractedEvent
-    ) -> None:
-        """
-        Create Event node in Neo4j.
-
-        Cypher:
-        MERGE (e:Event {event_id: $event_id})
-        SET e.event_type = $event_type,
-            e.category = $category,
-            e.sentiment = $sentiment,
-            e.description = $description,
-            e.date = $date,
-            e.source = $source
-        """
-        query = """
-        MERGE (e:Event {event_id: $event_id})
-        SET e += $properties
-        """
-        with self.driver.session() as session:
-            session.run(query, event_id=event.event_id,
-                       properties=event.to_neo4j_dict())
-
-    def link_event_to_document(
-        self,
-        event_id: str,
-        rcept_no: str
-    ) -> None:
-        """
-        Create REPORTED_BY relationship: Event → Document.
-
-        Cypher:
-        MATCH (e:Event {event_id: $event_id})
-        MATCH (d:Document {rcept_no: $rcept_no})
-        MERGE (e)-[:REPORTED_BY]->(d)
-        """
-        query = """
-        MATCH (e:Event {event_id: $event_id})
-        MATCH (d:Document {rcept_no: $rcept_no})
-        MERGE (e)-[:REPORTED_BY]->(d)
-        """
-        with self.driver.session() as session:
-            session.run(query, event_id=event_id, rcept_no=rcept_no)
-
-    def link_event_to_company(
-        self,
-        event_id: str,
-        stock_code: str
-    ) -> None:
-        """
-        Create INVOLVED_IN relationship: Company → Event.
-
-        Cypher:
-        MATCH (c:Company {stock_code: $stock_code})
-        MATCH (e:Event {event_id: $event_id})
-        MERGE (c)-[:INVOLVED_IN]->(e)
-        """
-        query = """
-        MATCH (c:Company {stock_code: $stock_code})
-        MATCH (e:Event {event_id: $event_id})
-        MERGE (c)-[:INVOLVED_IN]->(e)
-        """
-        with self.driver.session() as session:
-            session.run(query, event_id=event_id, stock_code=stock_code)
-```
-
-**Input/Output Summary:**
-
-| Method | Input | Output |
-|--------|-------|--------|
-| `create_document_node()` | rcept_no, report_nm, rcept_dt, corp_code, url, body | None (creates node) |
-| `create_event_node()` | ExtractedEvent | None (creates node) |
-| `link_event_to_document()` | event_id, rcept_no | None (creates edge) |
-| `link_event_to_company()` | event_id, stock_code | None (creates edge) |
-
----
-
-**4. Airflow DAG** (`stockelper-airflow/dags/dart_event_extraction_dag.py`)
-
-```python
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from stockelper_kg.collectors.dart_documents import DartDocumentCollector
-from stockelper_kg.extractors.dart_event_extractor import DartEventExtractor
-from stockelper_kg.graph.dart_event_builder import DartEventGraphBuilder
-import os
 
+default_args = {
+    'owner': '영상',
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+}
 
-# AI-sector stock codes (MVP pilot scope)
-AI_SECTOR_STOCKS = [
-    "035420",  # 네이버
-    "035720",  # 카카오
-    "047560",  # 이스트소프트
-    # ... other AI stocks
-]
-
-
-def fetch_and_extract_events(**context):
-    """Main task: fetch disclosures and extract events."""
-
-    # Initialize collectors
-    dart_collector = DartDocumentCollector(
-        api_key=os.getenv("OPEN_DART_API_KEY")
-    )
-    event_extractor = DartEventExtractor(
-        llm_client=get_llm_client()  # gpt-5.1
-    )
-    graph_builder = DartEventGraphBuilder(
-        neo4j_uri=os.getenv("NEO4J_URI"),
-        neo4j_user=os.getenv("NEO4J_USER"),
-        neo4j_password=os.getenv("NEO4J_PASSWORD")
-    )
-
-    # Date range: last 3 hours
-    end_date = datetime.now().strftime("%Y%m%d")
-    start_date = (datetime.now() - timedelta(hours=3)).strftime("%Y%m%d")
-
-    for stock_code in AI_SECTOR_STOCKS:
-        # Get corp_code from stock_code
-        corp_code = get_corp_code(stock_code)
-
-        # Fetch disclosure list
-        disclosures = dart_collector.fetch_disclosure_list(
-            corp_code, start_date, end_date, pblntf_ty="B"
-        )
-
-        for _, row in disclosures.iterrows():
-            rcept_no = row["rcept_no"]
-
-            # Fetch document body
-            body = dart_collector.fetch_document_body(rcept_no)
-            if body is None:
-                continue
-
-            # Create Document node
-            graph_builder.create_document_node(
-                rcept_no=rcept_no,
-                report_nm=row["report_nm"],
-                rcept_dt=row["rcept_dt"],
-                corp_code=corp_code,
-                url=dart_collector.get_document_url(rcept_no),
-                body=body
-            )
-
-            # Extract events
-            events = event_extractor.extract_events(
-                document_body=body,
-                rcept_no=rcept_no,
-                report_nm=row["report_nm"],
-                rcept_dt=row["rcept_dt"]
-            )
-
-            # Store events
-            for event in events:
-                graph_builder.create_event_node(event)
-                graph_builder.link_event_to_document(event.event_id, rcept_no)
-                graph_builder.link_event_to_company(event.event_id, stock_code)
-
-
-# DAG definition
 dag = DAG(
-    'dart_event_extraction',
-    description='Extract events from DART disclosures every 3 hours',
-    schedule_interval='0 */3 * * *',  # Every 3 hours
-    start_date=datetime(2025, 1, 1),
+    'dag_dart_disclosure_daily',
+    default_args=default_args,
+    description='Collect DART 36 major report types for AI-sector universe',
+    schedule_interval='0 8 * * *',  # 8:00 AM KST daily
+    start_date=datetime(2026, 1, 1),
     catchup=False,
-    default_args={
-        'retries': 3,
-        'retry_delay': timedelta(minutes=5),
+)
+
+# Task 1: Load Universe
+def load_universe_template(**context):
+    """Load AI-sector universe from template JSON."""
+    import json
+    with open('modules/dart_disclosure/universe.ai-sector.template.json', 'r') as f:
+        universe = json.load(f)
+    corp_codes = [stock['corp_code'] for stock in universe['stocks']]
+    context['task_instance'].xcom_push(key='corp_codes', value=corp_codes)
+
+task_load_universe = PythonOperator(
+    task_id='load_universe_template',
+    python_callable=load_universe_template,
+    dag=dag,
+)
+
+# Task 2: Collect 36 Major Report Types (per corp_code)
+def collect_major_reports(**context):
+    """Collect all 36 major report types for each corp_code."""
+    from stockelper_kg.collectors.dart_major_reports import DartMajorReportCollector
+    import os
+
+    corp_codes = context['task_instance'].xcom_pull(key='corp_codes', task_ids='load_universe_template')
+    collector = DartMajorReportCollector(api_key=os.getenv('OPEN_DART_API_KEY'))
+
+    for corp_code in corp_codes:
+        collector.collect_all_report_types(corp_code)
+        # Stores directly to Local PostgreSQL
+
+task_collect_reports = PythonOperator(
+    task_id='collect_36_major_reports',
+    python_callable=collect_major_reports,
+    dag=dag,
+)
+
+# Task 3: Extract Events
+def extract_events_from_disclosures(**context):
+    """Extract events from collected disclosure data."""
+    from stockelper_kg.extractors.dart_event_extractor import DartEventExtractor
+
+    extractor = DartEventExtractor()
+    extractor.process_all_new_disclosures()
+    # Reads from Local PostgreSQL, extracts events, stores to Neo4j
+
+task_extract_events = PythonOperator(
+    task_id='extract_events',
+    python_callable=extract_events_from_disclosures,
+    dag=dag,
+)
+
+# Task 4: Pattern Matching
+def match_event_patterns(**context):
+    """Match newly extracted events with historical patterns."""
+    from stockelper_kg.pattern_matcher import PatternMatcher
+
+    matcher = PatternMatcher()
+    matcher.find_similar_events()
+    # Creates SIMILAR_TO relationships in Neo4j
+
+task_pattern_match = PythonOperator(
+    task_id='pattern_matching',
+    python_callable=match_event_patterns,
+    dag=dag,
+)
+
+# Task Dependencies
+task_load_universe >> task_collect_reports >> task_extract_events >> task_pattern_match
+```
+
+---
+
+### Implementation Gap Analysis
+
+| Component | Planned | Implemented | Gap Status |
+|-----------|---------|-------------|------------|
+| **Data Collection** |
+| Universe template (JSON) | ✅ | ❌ | **Missing** - File needs creation |
+| 36 major report type collector | ✅ | ❌ | **Missing** - Module needs implementation |
+| Local PostgreSQL schemas (36 tables) | ✅ | ❌ | **Missing** - Schemas need creation |
+| **Event Extraction** |
+| DART event extractor module | ✅ | ❌ | **Missing** - Extractor logic needs implementation |
+| Sentiment scoring | ✅ | ❌ | **Missing** - LLM integration needed |
+| Event classification (7 categories) | ✅ | ❌ | **Missing** - Classification logic needed |
+| **Storage** |
+| Local PostgreSQL setup | ✅ | ❌ | **Missing** - Database initialization needed |
+| Neo4j Document nodes | ✅ | ❌ | **Missing** - Graph schema update needed |
+| Neo4j Event nodes | ✅ | ❌ | **Missing** - Graph schema update needed |
+| **Orchestration** |
+| Airflow DAG | ✅ | ❌ | **Missing** - DAG needs creation |
+| Daily schedule (8:00 AM) | ✅ | ❌ | **Missing** - Scheduling needs setup |
+
+---
+
+### Implementation Priority
+
+**CRITICAL (Must implement first):**
+1. Create `modules/dart_disclosure/universe.ai-sector.template.json`
+2. Implement `stockelper-kg/src/stockelper_kg/collectors/dart_major_reports.py`
+3. Create Local PostgreSQL schemas (36 tables)
+4. Implement Airflow DAG `dag_dart_disclosure_daily`
+
+**HIGH (Core functionality):**
+5. Implement `stockelper-kg/src/stockelper_kg/extractors/dart_event_extractor.py`
+6. Update Neo4j ontology for Document/Event nodes
+7. Implement sentiment scoring integration
+
+**MEDIUM (Enhancement):**
+8. Implement pattern matching logic
+9. Add user notification triggers
+10. Performance optimization (parallel collection)
+
+---
+
+### Data Requirements
+
+**Universe Template Structure:**
+```json
+{
+  "name": "AI Sector Universe",
+  "description": "Investment candidate stocks in AI sector",
+  "last_updated": "2026-01-03",
+  "stocks": [
+    {
+      "corp_code": "00126380",
+      "stock_code": "005930",
+      "corp_name": "삼성전자",
+      "sector": "AI Semiconductors"
+    },
+    {
+      "corp_code": "00164742",
+      "stock_code": "035420",
+      "corp_name": "NAVER",
+      "sector": "AI Services"
     }
-)
-
-task = PythonOperator(
-    task_id='fetch_and_extract_events',
-    python_callable=fetch_and_extract_events,
-    dag=dag
-)
+    // ... additional stocks
+  ]
+}
 ```
 
-**DAG Schedule:** Every 3 hours (aligned with Epic 1.1b requirements)
-
-**Input/Output:**
-- **Input:** Environment variables (API keys, Neo4j credentials)
-- **Output:** Document nodes, Event nodes, relationships in Neo4j
+**Estimated Data Volume:**
+- Universe size: ~50-100 AI sector stocks
+- Reports per stock per day: 0-5 (average 1-2)
+- Data storage per report: ~1-5 KB structured data
+- Daily data volume: ~50-500 KB
+- Monthly retention: ~1.5-15 MB
 
 ---
 
-#### **Storage Schema**
+### Technical Implementation Notes
 
-**Neo4j Cypher Constraints:**
+**API Rate Limiting:**
+- DART Open API: 10,000 requests/day limit
+- Recommended throttling: 5 requests/sec
+- Daily collection window: 8:00-9:00 AM (1-hour max execution time)
 
-```cypher
--- Document node
-CREATE CONSTRAINT document_rcept_no IF NOT EXISTS
-FOR (d:Document) REQUIRE d.rcept_no IS UNIQUE;
+**Error Handling:**
+- Missing data: Log warning, continue collection
+- API failures: Retry 3 times with exponential backoff
+- Invalid corp_code: Skip and alert
 
--- Event node
-CREATE CONSTRAINT event_id IF NOT EXISTS
-FOR (e:Event) REQUIRE e.event_id IS UNIQUE;
+**Data Validation:**
+- Check for duplicate rcept_no before insertion
+- Validate required fields (corp_code, rcept_dt, rcept_no)
+- Sanitize Korean text encoding (ensure UTF-8)
 
--- EventDate node
-CREATE CONSTRAINT event_date IF NOT EXISTS
-FOR (ed:EventDate) REQUIRE ed.date IS UNIQUE;
-```
-
-**Document Node Schema:**
-```cypher
-(:Document {
-    rcept_no: STRING,           # PRIMARY KEY
-    report_nm: STRING,          # Report title
-    rcept_dt: STRING,           # YYYYMMDD
-    url: STRING,                # DART viewer URL
-    body: STRING,               # Full document text
-    source: STRING,             # "DART"
-    created_at: DATETIME
-})
-```
-
-**Event Node Schema:**
-```cypher
-(:Event {
-    event_id: STRING,           # PRIMARY KEY (e.g., "EVT_20250101000001")
-    event_type: STRING,         # Ontology type (18 types)
-    category: STRING,           # 7-category classification
-    sentiment: FLOAT,           # -1.0 to 1.0
-    description: STRING,        # Event description
-    date: STRING,               # YYYY-MM-DD
-    source: STRING,             # "DART"
-    confidence: FLOAT,          # 0-1
-
-    # Context fields (optional, varies by event type)
-    amount: FLOAT,              # Transaction amount
-    market_cap_ratio: FLOAT,    # Relative to market cap
-    purpose: STRING,            # Purpose description
-    timing: STRING,             # 장중 vs 장마감
-
-    created_at: DATETIME
-})
-```
-
-**Relationships:**
-```cypher
--- Event → Document
-(e:Event)-[:REPORTED_BY]->(d:Document)
-
--- Company → Event
-(c:Company)-[:INVOLVED_IN]->(e:Event)
-
--- Event → EventDate
-(e:Event)-[:OCCURRED_ON]->(ed:EventDate)
-
--- EventDate → Date
-(ed:EventDate)-[:IS_DATE]->(d:Date)
-```
+**Performance Optimization:**
+- Parallel collection per corp_code (max 10 concurrent workers)
+- Bulk insert to PostgreSQL (batch size: 100 records)
+- Connection pooling for database access
 
 ---
 
-### Implementation Roadmap
+### Next Steps (Action Items)
 
-**Phase 1: Document Collection (Week 1)**
-- [ ] Create `dart_documents.py` collector
-- [ ] Implement `fetch_disclosure_list()`
-- [ ] Implement `fetch_document_body()`
-- [ ] Unit tests with real DART API
+**For 영상님 (Implementation Owner):**
+1. Review `references/DART(modified events).md` for complete implementation code
+2. Create Local PostgreSQL database and 36 table schemas
+3. Implement `DartMajorReportCollector` class
+4. Create `universe.ai-sector.template.json` with initial stock list
+5. Implement Airflow DAG `dag_dart_disclosure_daily`
+6. Test collection with 1-2 stocks before full deployment
 
-**Phase 2: Event Extraction (Week 2-3)**
-- [ ] Create `dart_event_extractor.py`
-- [ ] Design LLM prompts for 18 event types
-- [ ] Implement sentiment scoring logic
-- [ ] Test event extraction on sample disclosures
+**For Documentation Team:**
+7. Update PRD with FR126 (DART 36-type collection)
+8. Update epics.md Story 1.2 with new collection approach
+9. Update architecture.md with final implementation details
 
-**Phase 3: Graph Storage (Week 3)**
-- [ ] Create `dart_event_builder.py`
-- [ ] Implement Document/Event node creation
-- [ ] Implement relationship creation
-- [ ] Neo4j constraint setup
-
-**Phase 4: Orchestration (Week 4)**
-- [ ] Create Airflow DAG
-- [ ] Implement 3-hour scheduling
-- [ ] Error handling and retries
-- [ ] Monitoring and logging
-
-**Phase 5: Validation (Week 5)**
-- [ ] End-to-end testing
-- [ ] Validate against DART(main events).md examples
-- [ ] Sentiment score accuracy review
-- [ ] Performance optimization
+**Reference Files:**
+- `docs/references/DART(modified events).md` - Complete implementation code (민우 2026-01-03)
+- `docs/meeting-analysis-2026-01-03.md` - Meeting decisions and requirements
+- `docs/DOCUMENTATION-UPDATE-PLAN.md` - Comprehensive update checklist
+- `docs/architecture.md` - Updated DART 36-type collection architecture
 
 ---
-
 ## C) Service Mapping
 
 ### Ownership Matrix

@@ -217,15 +217,238 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
 ### Dual Event Pipeline Architecture
 
 **Pipeline 1: Disclosure-Based Events (DART)**
-- **Frequency:** Checked once per day
-- **Source:** DART API (official Korean financial disclosure system)
+- **Frequency:** Checked once per day (8:00 AM KST)
+- **Source:** DART API - 36 Major Report Type Endpoints (official Korean financial disclosure system)
+- **Collection Strategy:** Structured API-based collection (Updated 2026-01-03)
 - **Workflow:**
-  1. Daily check for new disclosure information
-  2. When new disclosure detected → Extract events
-  3. Add events to Neo4j knowledge graph
-  4. Compare new event with historical events (already in graph)
-  5. Measure resulting stock price movement
-  6. Notify user based on pattern matching
+  1. Daily check for new disclosure information using 36 major report type APIs
+  2. When new disclosure detected → Extract structured data per report type
+  3. Event extraction with sentiment scoring
+  4. Add events to Neo4j knowledge graph
+  5. Compare new event with historical events (already in graph)
+  6. Measure resulting stock price movement
+  7. Notify user based on pattern matching
+
+#### DART 36 Major Report Type Collection (Decision 3c - Updated 2026-01-03)
+
+**Status:** Structured Collection Strategy (Based on 민우 2026-01-03 work)
+
+**Choice:** API-based structured collection using 36 dedicated major report type endpoints
+
+**Universe Scope:**
+- **Source:** `modules/dart_disclosure/universe.ai-sector.template.json`
+- **Definition:** AI-sector stock tickers (investment candidate pool)
+- **Purpose:** Filter target stocks for disclosure collection
+
+**36 Major Report Types - 8 Categories:**
+
+| Category | Count | Report Types | Example |
+|----------|-------|--------------|---------|
+| **기업상태** (Company Status) | 5 | 부도발생, 영업정지, 회생절차_개시신청, 해산사유_발생, 자산양수도_풋백옵션 | Critical company events |
+| **증자감자** (Capital Changes) | 4 | 유상증자_결정, 무상증자_결정, 유무상증자_결정, 감자_결정 | Capital structure changes |
+| **채권은행** (Creditor Bank) | 2 | 채권은행_관리절차_개시, 채권은행_관리절차_중단 | Bank management procedures |
+| **소송** (Litigation) | 1 | 소송등_제기 | Legal proceedings |
+| **해외상장** (Overseas Listing) | 4 | 해외증권시장_상장_결정, 상장폐지_결정, 상장, 상장폐지 | International listing events |
+| **사채발행** (Bond Issuance) | 4 | 전환사채권_발행결정, 신주인수권부사채권_발행결정, 교환사채권_발행결정, 상각형_조건부자본증권_발행결정 | Convertible bonds, warrants |
+| **자기주식** (Treasury Stock) | 4 | 자기주식_취득_결정, 처분_결정, 신탁계약_체결_결정, 신탁계약_해지_결정 | Share buyback activities |
+| **영업/자산양수도** (Business/Asset Transfer) | 12+ | 영업양수_결정, 영업양도_결정, 유형자산_양수_결정, 유형자산_양도_결정, 타법인주식_처분_결정, etc. | M&A and asset transactions |
+
+**Total:** 36 structured API endpoints with dedicated schemas
+
+**Collection Pipeline:**
+```
+1. Load Universe (AI-sector stocks from template.json)
+   ↓
+2. For each corp_code in universe:
+   ↓
+3. Parallel Collection of 36 Major Report Types
+   - Each type has dedicated DART API endpoint
+   - Returns structured fields (not unstructured text)
+   ↓
+4. Storage: Local PostgreSQL
+   - 36 tables (one per report type)
+   - Structured schema per type
+   ↓
+5. Event Extraction + Sentiment Scoring
+   - LLM-based classification (gpt-5.1)
+   - Sentiment range: -1.0 to 1.0
+   - 7 DART event categories mapping
+   ↓
+6. Neo4j Storage
+   - Document nodes (source data)
+   - Event nodes (extracted events)
+   - Relationships: (Event)-[:EXTRACTED_FROM]->(Document)
+   ↓
+7. Pattern Matching & Notifications
+```
+
+**Storage Architecture:**
+
+**Local PostgreSQL:**
+- DART disclosure raw data (36 report type tables)
+- Event extraction results
+- Sentiment scores
+- Daily stock price data (for backtesting)
+
+**Remote PostgreSQL (`${POSTGRES_HOST}`):**
+- Backtesting results
+- Portfolio recommendations
+- User data
+- Notifications
+
+**Neo4j:**
+- Document nodes (DART disclosures)
+- Event nodes (extracted events)
+- Stock nodes (companies)
+- Relationships and temporal patterns
+
+**Data Schema Example (per report type):**
+```sql
+-- Example: 유상증자_결정 (Paid-in Capital Increase Decision)
+CREATE TABLE dart_piic_decsn (
+    rcept_no VARCHAR PRIMARY KEY,        -- Receipt number (unique identifier)
+    corp_code VARCHAR NOT NULL,          -- 8-digit company code
+    stock_code VARCHAR,                  -- 6-digit stock code
+    corp_name VARCHAR,                   -- Company name
+    rcept_dt DATE NOT NULL,              -- Receipt date
+    -- Report-specific structured fields (provided by DART API)
+    nstk_astock_co BIGINT,               -- New stock count
+    nstk_estmtamt DECIMAL(20,2),         -- Estimated amount
+    fv_amount DECIMAL(20,2),             -- Face value amount
+    -- Metadata
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Similar tables for each of the 36 report types
+-- Each with report-specific structured fields
+```
+
+**API Endpoints (36 total):**
+```python
+# Example endpoint structure
+DART_API_BASE = "https://opendart.fss.or.kr/api"
+
+MAJOR_REPORT_ENDPOINTS = {
+    "기업상태": {
+        "dfOcr": f"{DART_API_BASE}/dfOcr.json",           # 부도발생
+        "bsnSp": f"{DART_API_BASE}/bsnSp.json",           # 영업정지
+        # ... 3 more
+    },
+    "증자감자": {
+        "piicDecsn": f"{DART_API_BASE}/piicDecsn.json",   # 유상증자_결정
+        "fricDecsn": f"{DART_API_BASE}/fricDecsn.json",   # 무상증자_결정
+        # ... 2 more
+    },
+    # ... 6 more categories
+}
+```
+
+**Airflow DAG Specification:**
+```python
+# dags/dart_disclosure_collection_dag.py
+DAG_ID = "dag_dart_disclosure_daily"
+SCHEDULE = "0 8 * * *"  # 8:00 AM KST daily
+
+# Tasks:
+# 1. load_universe_task → Load AI-sector stocks
+# 2. collect_36_types_parallel_task → Parallel API calls (36 endpoints × N stocks)
+# 3. store_local_postgres_task → Bulk insert to local PostgreSQL
+# 4. trigger_event_extraction_task → Start event extraction pipeline
+# 5. store_neo4j_task → Create Document/Event nodes
+```
+
+**Event Extraction (7 Categories):**
+- 자본 변동 (Capital Changes)
+- M&A 및 지배구조 (M&A & Governance)
+- 재무 관련 (Financial)
+- 영업 및 사업 (Business Operations)
+- 배당 (Dividends)
+- 소송 및 분쟁 (Legal)
+- 기타 (Other)
+
+**Implementation Gap Status:**
+- ✅ **Planned:** Collection architecture designed
+- ❌ **Not Implemented:** 36-type API collection module
+- ❌ **Not Implemented:** Local PostgreSQL schemas
+- ❌ **Not Implemented:** Airflow DAG for 36-type collection
+- 📋 **Action Item:** 영상님 - Implement based on 민우 2026-01-03 work
+
+**Reference:** See `references/DART(modified events).md` for complete implementation code and `meeting-analysis-2026-01-03.md` for detailed requirements.
+
+---
+
+#### Daily Stock Price Data Collection (Decision 3d - Added 2026-01-03)
+
+**Purpose:** Provide historical price data for backtesting and portfolio recommendation engines.
+
+**Data Source:**
+- KIS OpenAPI or similar Korean stock market data provider
+- Universe: AI-sector stocks (same template as DART collection)
+
+**Collection Schedule:**
+- Daily execution after market close
+- Collect OHLCV (Open, High, Low, Close, Volume) data
+- Target: All stocks in `modules/dart_disclosure/universe.ai-sector.template.json`
+
+**Data Schema (Local PostgreSQL):**
+```sql
+CREATE TABLE daily_stock_prices (
+    stock_code VARCHAR(6) NOT NULL,
+    trade_date DATE NOT NULL,
+    open_price DECIMAL(12,2),
+    high_price DECIMAL(12,2),
+    low_price DECIMAL(12,2),
+    close_price DECIMAL(12,2),
+    volume BIGINT,
+    market_cap DECIMAL(20,2),
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (stock_code, trade_date)
+);
+
+CREATE INDEX idx_stock_date ON daily_stock_prices(stock_code, trade_date DESC);
+CREATE INDEX idx_trade_date ON daily_stock_prices(trade_date DESC);
+```
+
+**Airflow DAG Specification:**
+```python
+# dags/daily_price_collection_dag.py
+DAG_ID = 'dag_daily_price_collection'
+SCHEDULE = '0 16 * * 1-5'  # 4:00 PM KST, weekdays only
+OWNER = '영상'
+
+Tasks:
+1. load_universe_template
+   - Read modules/dart_disclosure/universe.ai-sector.template.json
+   - Extract stock codes
+
+2. collect_daily_prices (parallelized per stock)
+   - For each stock: Fetch OHLCV from KIS API
+   - Rate limiting: Max 5 requests/sec
+
+3. store_to_local_postgresql
+   - Bulk insert to daily_stock_prices table
+   - Handle duplicates (ON CONFLICT DO UPDATE)
+
+4. validation_and_alert
+   - Check for missing stocks
+   - Alert if data collection failed
+```
+
+**Storage:**
+- **Location:** Local PostgreSQL (NOT remote)
+- **Purpose:** Backtesting engine reads price history from this table
+- **Retention:** Keep all historical data (no cleanup policy)
+
+**Implementation Gap:**
+- ❌ Not Implemented: Price collection module
+- ❌ Not Implemented: Airflow DAG
+- ❌ Not Implemented: Local PostgreSQL schema
+- 📋 Action Item: 영상님 - Implement daily price collection pipeline
+
+**Reference:** See `meeting-analysis-2026-01-03.md` Section 4 for requirements.
+
+---
 
 **Pipeline 2: News-Based Events**
 - **Frequency:** Every 2-3 hours per specific stock
@@ -2695,6 +2918,34 @@ Endpoints:
     - `user_portfolios` (user holdings)
     - `portfolio_recommendations` (generated reports/history)
 
+**Detailed Schema - portfolio_recommendations (Updated 2026-01-03):**
+```sql
+CREATE TABLE portfolio_recommendations (
+    id SERIAL PRIMARY KEY,
+    job_id UUID NOT NULL UNIQUE,           -- NEW: Unique job identifier
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    content TEXT NOT NULL,                 -- LLM-generated Markdown report
+    image_base64 TEXT,                     -- Optional PNG/chart (Base64-encoded)
+    created_at TIMESTAMP DEFAULT NOW(),    -- Request initiated
+    updated_at TIMESTAMP DEFAULT NOW(),    -- Last modification
+    written_at TIMESTAMP,                  -- Result written (nullable)
+    completed_at TIMESTAMP,                -- Job finished (nullable)
+    status VARCHAR(20) DEFAULT '작업 전',   -- Korean status enum
+    CONSTRAINT valid_status CHECK (status IN ('작업 전', '처리 중', '완료', '실패'))
+);
+
+CREATE INDEX idx_portfolio_user ON portfolio_recommendations(user_id, created_at DESC);
+CREATE INDEX idx_portfolio_job ON portfolio_recommendations(job_id);
+CREATE INDEX idx_portfolio_status ON portfolio_recommendations(status)
+    WHERE status IN ('작업 전', '처리 중');  -- For active jobs
+```
+
+**Status Enum Values (Korean):**
+- `작업 전`: Before Processing (initial state)
+- `처리 중`: In Progress (portfolio generation running)
+- `완료`: Completed (recommendation ready)
+- `실패`: Failed (error during generation)
+
 **Feature 4: Backtesting System (FR29-FR39)**
 - **Backend Logic:**
   - `stockelper-backtesting/` (separate repo, local)
@@ -2714,6 +2965,42 @@ Endpoints:
     - `backtest_jobs` (job status)
     - `backtest_results` (generated report/content)
     - `daily_stock_prices` (read-only, if maintained in the same DB)
+
+**Detailed Schema - backtest_results (Updated 2026-01-03):**
+```sql
+CREATE TABLE backtest_results (
+    id SERIAL PRIMARY KEY,
+    job_id UUID NOT NULL UNIQUE,           -- NEW: Unique job identifier
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    content TEXT NOT NULL,                 -- LLM-generated Markdown report
+    image_base64 TEXT,                     -- Optional performance chart (Base64-encoded PNG)
+    strategy_description TEXT,             -- User's backtesting strategy
+    universe_filter TEXT,                  -- Applied universe (e.g., "AI sector")
+    created_at TIMESTAMP DEFAULT NOW(),    -- Request initiated
+    updated_at TIMESTAMP DEFAULT NOW(),    -- Last modification
+    written_at TIMESTAMP,                  -- Result written (nullable)
+    completed_at TIMESTAMP,                -- Job finished (nullable)
+    status VARCHAR(20) DEFAULT '작업 전',   -- Korean status enum
+    execution_time_seconds INTEGER,        -- Actual execution duration
+    CONSTRAINT valid_status CHECK (status IN ('작업 전', '처리 중', '완료', '실패'))
+);
+
+CREATE INDEX idx_backtest_user ON backtest_results(user_id, created_at DESC);
+CREATE INDEX idx_backtest_job ON backtest_results(job_id);
+CREATE INDEX idx_backtest_status ON backtest_results(status)
+    WHERE status IN ('작업 전', '처리 중');  -- For active jobs
+```
+
+**Status Enum Values (Korean):**
+- `작업 전`: Before Processing (initial state)
+- `처리 중`: In Progress (backtesting running, 5min-1hr expected)
+- `완료`: Completed (results ready for viewing)
+- `실패`: Failed (error during backtesting)
+
+**Performance Constraints (from 2026-01-03 meeting):**
+- Simple 1-year backtest: ~5 minutes execution time
+- Complex multi-indicator strategy: Up to 1 hour execution time
+- Async processing required with browser notifications on completion
 
 **Feature 5: Alert & Notification System (FR40-FR47)**
 - **Backend Logic:**
