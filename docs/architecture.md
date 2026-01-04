@@ -218,10 +218,10 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
 
 **Pipeline 1: Disclosure-Based Events (DART)**
 - **Frequency:** Checked once per day (8:00 AM KST)
-- **Source:** DART API - 36 Major Report Type Endpoints (official Korean financial disclosure system)
-- **Collection Strategy:** Structured API-based collection (Updated 2026-01-03)
+- **Source:** DART API - 20 Major Report Type Endpoints (official Korean financial disclosure system)
+- **Collection Strategy:** Structured API-based collection (Updated 2026-01-04)
 - **Workflow:**
-  1. Daily check for new disclosure information using 36 major report type APIs
+  1. Daily check for new disclosure information using 20 major report type APIs
   2. When new disclosure detected → Extract structured data per report type
   3. Event extraction with sentiment scoring
   4. Add events to Neo4j knowledge graph
@@ -229,31 +229,29 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
   6. Measure resulting stock price movement
   7. Notify user based on pattern matching
 
-#### DART 36 Major Report Type Collection (Decision 3c - Updated 2026-01-03)
+#### DART 20 Major Report Type Collection (Decision 3c - Updated 2026-01-04)
 
 **Status:** Structured Collection Strategy (Based on 민우 2026-01-03 work)
 
-**Choice:** API-based structured collection using 36 dedicated major report type endpoints
+**Choice:** API-based structured collection using 20 dedicated major report type endpoints
 
 **Universe Scope:**
 - **Source:** `modules/dart_disclosure/universe.ai-sector.template.json`
 - **Definition:** AI-sector stock tickers (investment candidate pool)
 - **Purpose:** Filter target stocks for disclosure collection
 
-**36 Major Report Types - 8 Categories:**
+**20 Major Report Types - 6 Categories:**
 
 | Category | Count | Report Types | Example |
 |----------|-------|--------------|---------|
-| **기업상태** (Company Status) | 5 | 부도발생, 영업정지, 회생절차_개시신청, 해산사유_발생, 자산양수도_풋백옵션 | Critical company events |
-| **증자감자** (Capital Changes) | 4 | 유상증자_결정, 무상증자_결정, 유무상증자_결정, 감자_결정 | Capital structure changes |
-| **채권은행** (Creditor Bank) | 2 | 채권은행_관리절차_개시, 채권은행_관리절차_중단 | Bank management procedures |
-| **소송** (Litigation) | 1 | 소송등_제기 | Legal proceedings |
-| **해외상장** (Overseas Listing) | 4 | 해외증권시장_상장_결정, 상장폐지_결정, 상장, 상장폐지 | International listing events |
-| **사채발행** (Bond Issuance) | 4 | 전환사채권_발행결정, 신주인수권부사채권_발행결정, 교환사채권_발행결정, 상각형_조건부자본증권_발행결정 | Convertible bonds, warrants |
-| **자기주식** (Treasury Stock) | 4 | 자기주식_취득_결정, 처분_결정, 신탁계약_체결_결정, 신탁계약_해지_결정 | Share buyback activities |
-| **영업/자산양수도** (Business/Asset Transfer) | 12+ | 영업양수_결정, 영업양도_결정, 유형자산_양수_결정, 유형자산_양도_결정, 타법인주식_처분_결정, etc. | M&A and asset transactions |
+| **증자감자** (Capital Changes) | 4 | 유상증자결정, 무상증자결정, 유무상증자결정, 감자결정 | Capital structure changes |
+| **사채발행** (Bond Issuance) | 2 | 전환사채발행결정, 신주인수권부사채발행결정 | Convertible bonds with warrants |
+| **자기주식** (Treasury Stock) | 4 | 자기주식취득결정, 자기주식처분결정, 자기주식신탁계약체결결정, 자기주식신탁계약해지결정 | Share buyback activities |
+| **영업양수도** (Business Operations) | 4 | 영업양수결정, 영업양도결정, 유형자산양수결정, 유형자산양도결정 | Business operations transfers |
+| **주식양수도** (Securities Transactions) | 2 | 타법인주식및출자증권취득결정, 타법인주식및출자증권처분결정 | Securities acquisitions/disposals |
+| **기업인수합병** (M&A/Restructuring) | 4 | 합병결정, 분할결정, 분할합병결정, 주식교환·이전결정 | M&A and restructuring events |
 
-**Total:** 36 structured API endpoints with dedicated schemas
+**Total:** 20 structured API endpoints with dedicated schemas
 
 **Collection Pipeline:**
 ```
@@ -261,18 +259,18 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
    ↓
 2. For each corp_code in universe:
    ↓
-3. Parallel Collection of 36 Major Report Types
+3. Parallel Collection of 20 Major Report Types
    - Each type has dedicated DART API endpoint
    - Returns structured fields (not unstructured text)
    ↓
 4. Storage: Local PostgreSQL
-   - 36 tables (one per report type)
+   - 20 tables (one per report type)
    - Structured schema per type
    ↓
 5. Event Extraction + Sentiment Scoring
    - LLM-based classification (gpt-5.1)
    - Sentiment range: -1.0 to 1.0
-   - 7 DART event categories mapping
+   - 6 DART event categories mapping
    ↓
 6. Neo4j Storage
    - Document nodes (source data)
@@ -285,7 +283,7 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
 **Storage Architecture:**
 
 **Local PostgreSQL:**
-- DART disclosure raw data (36 report type tables)
+- DART disclosure raw data (20 report type tables)
 - Event extraction results
 - Sentiment scores
 - Daily stock price data (for backtesting)
@@ -320,11 +318,11 @@ CREATE TABLE dart_piic_decsn (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Similar tables for each of the 36 report types
+-- Similar tables for each of the 20 report types
 -- Each with report-specific structured fields
 ```
 
-**API Endpoints (36 total):**
+**API Endpoints (20 total):**
 ```python
 # Example endpoint structure
 DART_API_BASE = "https://opendart.fss.or.kr/api"
@@ -352,26 +350,25 @@ SCHEDULE = "0 8 * * *"  # 8:00 AM KST daily
 
 # Tasks:
 # 1. load_universe_task → Load AI-sector stocks
-# 2. collect_36_types_parallel_task → Parallel API calls (36 endpoints × N stocks)
+# 2. collect_20_types_parallel_task → Parallel API calls (20 endpoints × N stocks)
 # 3. store_local_postgres_task → Bulk insert to local PostgreSQL
 # 4. trigger_event_extraction_task → Start event extraction pipeline
 # 5. store_neo4j_task → Create Document/Event nodes
 ```
 
-**Event Extraction (7 Categories):**
-- 자본 변동 (Capital Changes)
-- M&A 및 지배구조 (M&A & Governance)
-- 재무 관련 (Financial)
-- 영업 및 사업 (Business Operations)
-- 배당 (Dividends)
-- 소송 및 분쟁 (Legal)
-- 기타 (Other)
+**Event Extraction (6 Categories):**
+- 증자감자 (Capital Changes)
+- 사채발행 (Bond Issuance)
+- 자기주식 (Treasury Stock)
+- 영업양수도 (Business Operations)
+- 주식양수도 (Securities Transactions)
+- 기업인수합병 (M&A/Restructuring)
 
 **Implementation Gap Status:**
 - ✅ **Planned:** Collection architecture designed
-- ❌ **Not Implemented:** 36-type API collection module
+- ❌ **Not Implemented:** 20-type API collection module
 - ❌ **Not Implemented:** Local PostgreSQL schemas
-- ❌ **Not Implemented:** Airflow DAG for 36-type collection
+- ❌ **Not Implemented:** Airflow DAG for 20-type collection
 - 📋 **Action Item:** 영상님 - Implement based on 민우 2026-01-03 work
 
 **Reference:** See `references/DART(modified events).md` for complete implementation code and `meeting-analysis-2026-01-03.md` for detailed requirements.

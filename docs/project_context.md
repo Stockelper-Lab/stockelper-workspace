@@ -2,15 +2,96 @@
 project_name: 'Stockelper'
 user_name: 'Oldman'
 date: '2025-12-18'
-last_updated: '2026-01-03'
-sections_completed: ['technology_stack', 'language_rules', 'architectural_decisions', 'service_boundaries', 'ux_patterns', 'common_pitfalls', 'data_schemas_updated']
+last_updated: '2026-01-04'
+sections_completed: ['implementation_priority', 'technology_stack', 'language_rules', 'architectural_decisions', 'service_boundaries', 'ux_patterns', 'common_pitfalls', 'data_schemas_updated']
 repositories: 7
 repository_list: ['stockelper-fe', 'stockelper-llm', 'stockelper-kg', 'stockelper-airflow', 'stockelper-news-crawler', 'stockelper-backtesting', 'stockelper-portfolio']
+implementation_strategy:
+  primary_data_source: 'DART Disclosures'
+  deferred_data_source: 'News Articles'
+  target_stocks_first: true
+  revised_sequence_date: '2026-01-04'
 ---
 
 # Project Context for AI Agents
 
 _This file contains critical rules and patterns that AI agents must follow when implementing code in this project. Focus on unobvious details that agents might otherwise miss._
+
+---
+
+## ⚠️ CRITICAL: Implementation Priority (Updated 2026-01-04)
+
+**Strategic Priority Change:**
+
+**PRIMARY DATA SOURCE: DART Disclosures (Prioritize)**
+- Focus on DART disclosure data collection and event/sentiment extraction
+- Target stocks only (AI sector) for initial implementation
+- DART provides structured, high-quality event data
+
+**DEFERRED DATA SOURCE: News Articles (Defer to Later Phase)**
+- News collection and event/sentiment extraction deferred
+- Will be implemented after DART-based foundation is operational
+
+**Implementation Sequence (MUST FOLLOW THIS ORDER):**
+
+1. **DART Disclosure Collection** (Story 1.1b - Collection section)
+   - 20 major report types via DART API (6 categories)
+     - Capital Changes (4): Paid-in Capital Increase, Bonus Issue, Paid-in and Bonus Issue, Capital Reduction
+     - Bond Issuance (2): Convertible Bonds, Bonds with Warrants
+     - Treasury Stock (4): Acquisition Decision, Disposal Decision, Trust Contract Execution, Trust Contract Termination
+     - Business Operations (4): Business Acquisition, Business Transfer, Tangible Asset Acquisition, Tangible Asset Transfer
+     - Securities Transactions (2): Acquisition of Shares/Equity Securities, Transfer of Shares/Equity Securities
+     - M&A/Restructuring (4): Merger, Corporate Spin-off, Merger Following Spin-off, Stock Exchange/Stock Transfer
+   - Store in Local PostgreSQL (20 tables, one per report type)
+   - Target stocks only (AI sector)
+
+2. **Event & Sentiment Extraction from DART** (Story 1.1b - Extraction section)
+   - LLM-based extraction with DART-specific prompts
+   - Store events in Neo4j with sentiment scores (-1 to 1)
+   - Source attribute: "DART"
+
+3. **Daily Stock Price Collection** (Story 1.8)
+   - OHLCV data from KIS OpenAPI
+   - Store in Local PostgreSQL `daily_stock_prices` table
+   - Required for backtesting
+
+4. **Knowledge Graph Construction** (Integrated in Story 1.1b)
+   - Neo4j graph with Event nodes, Document nodes
+   - Entity relationships and pattern matching
+
+5. **Backtesting Container Implementation** (Epic 3 Stories 3.1-3.6)
+   - Dedicated independent container service
+   - Write results to Remote PostgreSQL (t3.medium)
+
+6. **Portfolio Recommendation Container Implementation** (Epic 2 Stories 2.4, 2.5)
+   - Separate container service
+   - Write results to Remote PostgreSQL (t3.medium)
+
+7. **Results Persistence to PostgreSQL** (Integrated in above)
+   - Both containers write to Remote PostgreSQL on AWS t3.medium
+   - Unified data model with Korean status enum
+
+8. **Frontend Implementation**
+   - Dedicated Backtesting page (Story 3.1 - Frontend)
+   - Dedicated Portfolio Recommendation page (Story 2.4 - Frontend)
+
+9. **User Progress Visualization** (Integrated in frontend)
+   - Supabase Realtime subscriptions
+   - Real-time status updates
+
+**DEFERRED STORIES (DO NOT IMPLEMENT YET):**
+- ❌ Story 1.1a: Automate News Event Extraction
+- ❌ Story 1.2: Frontend Event Timeline Visualization
+- ❌ Story 1.3: Multi-Timeframe Prediction UI
+- ❌ Story 1.4: Rich Chat Prediction Cards
+- ❌ Story 1.5: Suggested Queries Based on Portfolio
+
+**Why This Order:**
+- DART disclosure data provides structured, reliable event intelligence
+- Backtesting and portfolio recommendations are core user value features
+- News-based features can be added incrementally after foundation is solid
+
+**Reference:** See `docs/implementation-readiness-report-2026-01-04.md` (ADDENDUM section) for complete details.
 
 ---
 

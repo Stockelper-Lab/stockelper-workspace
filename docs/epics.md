@@ -555,10 +555,10 @@ Users see rich visualizations of event patterns and historical matches; system a
 
 ---
 
-#### Story 1.1b: DART Disclosure Collection using 36 Major Report Type APIs (Updated 2026-01-03)
+#### Story 1.1b: DART Disclosure Collection using 20 Major Report Type APIs (Updated 2026-01-04)
 
 **As a** user
-**I want** the system to collect DART disclosures using 36 structured major report type APIs
+**I want** the system to collect DART disclosures using 20 structured major report type APIs
 **So that** I receive high-quality structured event data for comprehensive event intelligence
 
 **Acceptance Criteria:**
@@ -568,18 +568,16 @@ Users see rich visualizations of event patterns and historical matches; system a
 **Then** the following conditions are met:
 
 **DART Data Collection (FR126, FR127):**
-- Collect 36 major report types using dedicated DART API endpoints per type (FR126)
+- Collect 20 major report types using dedicated DART API endpoints per type (FR126)
 - Collection based on universe template: `modules/dart_disclosure/universe.ai-sector.template.json`
-- 8 categories, 36 total report types:
-  1. 기업상태 (Company Status): 5 types - 부도발생, 영업정지, 회생절차, 해산사유, 풋백옵션
-  2. 증자감자 (Capital Changes): 4 types - 유상증자, 무상증자, 유무상증자, 감자
-  3. 채권은행 (Creditor Bank): 2 types - 관리절차 개시/중단
-  4. 소송 (Litigation): 1 type - 소송등 제기
-  5. 해외상장 (Overseas Listing): 4 types - 상장/폐지 결정 및 실행
-  6. 사채발행 (Bond Issuance): 4 types - 전환사채, 신주인수권부사채, 교환사채, 조건부자본증권
-  7. 자기주식 (Treasury Stock): 4 types - 취득/처분 결정 및 신탁계약
-  8. 영업/자산양수도 (Transfer): 4+ types - 영업/자산 양수도 결정
-- Store structured data in **Local PostgreSQL** (36 dedicated tables, one per report type) (FR127)
+- 6 categories, 20 total report types:
+  1. 증자감자 (Capital Changes): 4 types - 유상증자결정, 무상증자결정, 유무상증자결정, 감자결정
+  2. 사채발행 (Bond Issuance): 2 types - 전환사채발행결정, 신주인수권부사채발행결정
+  3. 자기주식 (Treasury Stock): 4 types - 자기주식취득결정, 자기주식처분결정, 자기주식신탁계약체결결정, 자기주식신탁계약해지결정
+  4. 영업양수도 (Business Operations): 4 types - 영업양수결정, 영업양도결정, 유형자산양수결정, 유형자산양도결정
+  5. 주식양수도 (Securities Transactions): 2 types - 타법인주식및출자증권취득결정, 타법인주식및출자증권처분결정
+  6. 기업인수합병 (M&A/Restructuring): 4 types - 합병결정, 분할결정, 분할합병결정, 주식교환·이전결정
+- Store structured data in **Local PostgreSQL** (20 dedicated tables, one per report type) (FR127)
 - Each table has common fields (rcept_no, corp_code, stock_code, rcept_dt) plus report-specific fields
 - Daily schedule at 8:00 AM KST aligned with DART disclosure times
 - Rate limiting: Max 5 requests/sec to respect DART API limits
@@ -590,20 +588,20 @@ Users see rich visualizations of event patterns and historical matches; system a
 - Extract sentiment score (-1 to 1 range) for each DART event (FR2)
 - Assign source attribute "DART" to all extracted events (FR2b)
 - For dates with no events extracted, standardize sentiment score to 0 (FR2c)
-- Classify events into 7 major DART categories matching the 8 collection categories (FR2d)
+- Classify events into 6 major DART categories matching the collection categories (FR2d)
 - Extract event context from structured fields: amount, market cap ratio, purpose, timing (FR2e)
 - Reference implementation: `docs/references/DART(modified events).md` (민우 2026-01-03)
 
 **Database changes:**
-- **Local PostgreSQL**: 36 new tables (dart_piicDecsn, dart_dfOcr, etc.) with structured schemas
+- **Local PostgreSQL**: 20 new tables (one per report type) with structured schemas
 - **Neo4j**: Add `sentiment` float property (-1 to 1) and `source` string property ("DART") to Event nodes
 - **Neo4j**: Add `event_context` JSON property with: {amount, market_cap_ratio, purpose, timing}
 - **Neo4j**: Document nodes linked to Event nodes via EXTRACTED_FROM relationship
 
 **Files affected:**
 - `/stockelper-kg/modules/dart_disclosure/universe.ai-sector.template.json` (new - universe definition)
-- `/stockelper-kg/src/stockelper_kg/collectors/dart_major_reports.py` (new - 36-type collector)
-- `/stockelper-kg/migrations/001_create_dart_disclosure_tables.sql` (new - 36 table schemas)
+- `/stockelper-kg/src/stockelper_kg/collectors/dart_major_reports.py` (new - 20-type collector)
+- `/stockelper-kg/migrations/001_create_dart_disclosure_tables.sql` (new - 20 table schemas)
 - `/stockelper-airflow/dags/dart_disclosure_collection_dag.py` (new DAG - daily 8AM collection)
 - `/stockelper-kg/src/stockelper_kg/extractors/dart_event_extractor.py` (new - event extraction from structured data)
 - `/stockelper-kg/src/stockelper_kg/prompts/dart_event_extraction.py` (DART-specific prompts)

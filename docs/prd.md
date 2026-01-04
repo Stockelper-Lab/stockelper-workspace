@@ -1308,7 +1308,7 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 
 ### Data Collection & Storage (Added 2026-01-03)
 
-- **FR126:** System can collect DART disclosures using 36 major report type APIs with structured field extraction
+- **FR126:** System can collect DART disclosures using 20 major report type APIs (6 categories) with structured field extraction
 - **FR127:** System can store DART disclosure data in local PostgreSQL with dedicated schemas per report type
 - **FR128:** Backtesting jobs include unique job_id (UUID) for tracking and reference across system
 - **FR129:** Portfolio recommendation jobs include unique job_id (UUID) for tracking and reference across system
