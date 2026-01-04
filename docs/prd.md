@@ -26,11 +26,15 @@ completion_date: '2025-12-09'
 Stockelper is evolving from an AI-powered stock analysis platform into an intelligent, event-driven investment assistant for the Korean stock market. This PRD defines new capabilities that transform how users interact with market events, predictions, and portfolio management.
 
 **Current System Capabilities:**
-- Multi-agent LLM system for stock analysis (LangGraph)
-- Neo4j knowledge graph of Korean stock market entities
-- Real-time data integration (DART, KIS OpenAPI, Naver Finance)
-- Automated data pipeline (Apache Airflow)
-- Modern web interface with user authentication
+- LangGraph-based multi-agent LLM system with 4 specialized agents (MarketAnalysis, FundamentalAnalysis, TechnicalAnalysis, InvestmentStrategy)
+- Neo4j knowledge graph with expanded event ontology (CAPITAL_RAISE, CAPITAL_RETURN, CAPITAL_STRUCTURE_CHANGE, LISTING_STATUS_CHANGE, and more)
+- Dual-source data collection: DART (20 major report types → PostgreSQL) + News (Naver + Toss → MongoDB)
+- LLM-based event extraction with sentiment scoring (-1.0 to +1.0) using GPT-5.1
+- Real-time data integration (DART API, KIS OpenAPI, News crawlers)
+- Automated data pipeline with 6 production DAGs (Apache Airflow)
+- Black-Litterman portfolio optimization with 11-factor ranking system
+- Async job queue system for backtesting with notification support
+- Modern web interface with JWT authentication and Supabase Realtime
 
 **New Capabilities Being Added:**
 1. **Event-Driven Prediction Engine:** Extract events from news, add to knowledge graph with date context, analyze stock fluctuations per subgraph, and predict future movements when similar events occur under similar conditions
@@ -1122,22 +1126,34 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 
 ### Event Intelligence & Knowledge Graph
 
-- **FR1:** System can extract financial events from Korean news articles (Naver Finance) with sentiment score (-1 to 1 range)
-- **FR1a:** System can extract news data via 6-month batch CLI for historical backfill
-- **FR1b:** System can collect news data on 3-hour interval schedule (00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00)
-- **FR1c:** System can assign source attribute "NEWS" to all news-extracted events
-- **FR2:** System can extract financial events from DART disclosure data with sentiment score (-1 to 1 range)
-- **FR2a:** System can use distinct extraction prompts for DART vs NEWS data
+- **FR1:** System can extract financial events from Korean news articles with sentiment score (-1 to 1 range) using dual crawlers (Naver + Toss)
+- **FR1a:** System can collect news data via dual crawlers: Naver (mobile API-based) and Toss (RESTful API-based)
+- **FR1b:** System can store news articles in MongoDB with collections: `naver_stock_news` and `toss_stock_news`
+- **FR1c:** System can prevent duplicate news articles using unique index on `articleUrl`
+- **FR1d:** System can extract news data via CLI for historical backfill
+- **FR1e:** System can collect news data on scheduled intervals via Airflow DAGs
+- **FR1f:** System can assign source attribute "NEWS" to all news-extracted events
+- **FR2:** System can extract financial events from DART disclosure data using GPT-5.1 with sentiment score (-1 to 1 range)
+- **FR2a:** System can use LLM-based extraction with distinct prompts for DART vs NEWS data
 - **FR2b:** System can assign source attribute "DART" to all DART-extracted events
 - **FR2c:** System can standardize sentiment score to 0 for dates with no extracted events
-- **FR2d:** System can classify DART events into 7 major categories: (1) Capital Changes, (2) M&A & Governance, (3) Financial, (4) Business Operations, (5) Dividends, (6) Legal, (7) Other
-- **FR2e:** System can extract event context from DART disclosures: amount, market cap ratio, purpose, timing (장중 vs 장마감)
+- **FR2d:** System can classify DART events into 6 major categories: (1) Capital Changes, (2) Bond Issuance, (3) Treasury Stock, (4) Business Operations, (5) Securities Transactions, (6) M&A/Restructuring
+- **FR2e:** System can extract event context from DART disclosures: amount, market cap ratio, purpose, timing
+- **FR2f:** System can use deterministic pre-classification rules before LLM extraction for performance optimization
+- **FR2g:** System can validate extracted events against slot schema per event type (required + optional slots)
+- **FR2h:** System can store extracted DART events in PostgreSQL table `dart_event_extractions` with JSONB slots
 - **FR3:** System can classify extracted events into defined ontology categories
 - **FR4:** System can store events in Neo4j knowledge graph with date indexing
 - **FR5:** System can capture event metadata (entities, conditions, categories, dates)
 - **FR6:** System can establish entity relationships within knowledge graph subgraphs
 - **FR7:** System can detect similar events based on historical patterns
 - **FR8:** System can identify "similar conditions" across different time periods and subgraphs
+- **FR8a:** System can classify events as CAPITAL_RAISE (유상증자/CB/BW/교환사채/증권신고서/전환청구권 등)
+- **FR8b:** System can classify events as CAPITAL_RETURN (자사주 취득/처분/소각, 배당 등)
+- **FR8c:** System can classify events as CAPITAL_STRUCTURE_CHANGE (감자 등)
+- **FR8d:** System can classify events as LISTING_STATUS_CHANGE (거래정지/상장폐지/재개/상폐심사 등)
+- **FR8e:** System can extract required and optional slots per event type with validation
+- **FR8f:** System can generate InvestorView objects with expected returns and confidence scores (0-1) for Black-Litterman model
 
 ### Prediction & Analysis
 
@@ -1164,6 +1180,24 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 - **FR26:** Users can update their investment profile preferences
 - **FR27:** Users can view their portfolio holdings
 - **FR28:** Users can remove stocks from their portfolio
+- **FR28a:** System implements Black-Litterman portfolio optimization model with 10-step calculation pipeline
+- **FR28b:** System performs 11-factor ranking of stocks: operating profit, net income, liabilities, rise/fall rates, profitability, stability, growth, activity, volume, market cap
+- **FR28c:** System executes ranking functions in parallel with rate limiting (default: 20 req/sec for KIS API)
+- **FR28d:** System normalizes ranking scores using formula: (n - rank + 1) / (n * (n+1) / 2)
+- **FR28e:** System aggregates weighted scores based on configurable RankWeight model
+- **FR28f:** System generates LLM-based InvestorViews with expected returns (-20% to +20%) and confidence (0-1)
+- **FR28g:** System calculates returns covariance matrix (252-day annualized from daily returns)
+- **FR28h:** System calculates market equilibrium implied returns using: pi = delta * Sigma * w_mkt
+- **FR28i:** System constructs view matrices (P, Q, Omega) for Black-Litterman posterior calculation
+- **FR28j:** System applies portfolio optimization with SLSQP solver and constraints: sum(weights)=1.0, each weight ∈ [0, 0.3]
+- **FR28k:** System calculates portfolio metrics: expected return, volatility, Sharpe ratio
+- **FR28l:** System filters output to exclude stocks with weight < 0.001
+- **FR28m:** System executes buy orders via KIS API with market order type
+- **FR28n:** System implements separate Buy and Sell workflows using LangGraph state machines
+- **FR28o:** System makes LLM-based sell decisions evaluating: loss/profit thresholds, fundamental deterioration, technical signals, news/risks, industry outlook
+- **FR28p:** System auto-loads KIS credentials from database and manages token lifecycle
+- **FR28q:** System supports paper trading and live trading modes
+- **FR28r:** System provides sell/hold recommendations (no short selling)
 
 ### Backtesting & Validation
 
@@ -1186,6 +1220,24 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 - **FR37:** System can display performance range (best case and worst case scenarios)
 - **FR38:** System can provide risk disclosures with backtesting results
 - **FR39:** System can show number of historical instances used in backtest
+- **FR39a:** System implements async job queue pattern for backtesting with PostgreSQL storage
+- **FR39b:** System creates backtest_jobs table with fields: id, user_id, stock_ticker, strategy_type, status, input_json, error_message, retry_count, timestamps
+- **FR39c:** System creates backtest_results table with fields: id, job_id, user_id, stock_ticker, strategy_type, results_json, generated_at
+- **FR39d:** System creates notifications table for job completion/failure alerts
+- **FR39e:** System supports job statuses: pending → in_progress → completed/failed
+- **FR39f:** System implements polling-based async worker with configurable interval (default: 5 seconds)
+- **FR39g:** System uses SELECT ... FOR UPDATE SKIP LOCKED for concurrent job reservation
+- **FR39h:** System finalizes successful jobs by: inserting result, updating status to completed, creating notification
+- **FR39i:** System finalizes failed jobs by: storing error message, updating status to failed, creating notification
+- **FR39j:** System provides dual API endpoints: legacy format + architecture-compatible format
+- **FR39k:** System maps database statuses to standard statuses: pending→queued(0%), in_progress→running(50%), completed→completed(100%), failed→failed(100%)
+- **FR39l:** System returns job_id (UUID string) for tracking
+- **FR39m:** System stores flexible input parameters as JSONB
+- **FR39n:** System stores flexible results as JSONB with Markdown content
+- **FR39o:** System tracks job timestamps: created_at, started_at, completed_at
+- **FR39p:** System implements exponential backoff for worker polling
+- **FR39q:** System supports user-scoped job isolation (all queries filtered by user_id)
+- **FR39r:** System provides progress percentage in status endpoint responses
 
 ### Alert & Notification System
 
@@ -1209,36 +1261,60 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 - **FR54:** System can provide conversational access to all event-driven features
 - **FR55:** Users can view prediction history through chat interface
 - **FR56:** System can display historical event timelines visually within chat
+- **FR56a:** System can stream responses via Server-Sent Events (SSE) for real-time token delivery
+- **FR56b:** System can emit progress events showing which agent is currently executing
+- **FR56c:** System can emit delta events for token-level streaming of LLM responses
+- **FR56d:** System can emit final events with complete message, subgraph data, and trading actions
+
+### LLM Multi-Agent System
+
+- **FR57:** System implements LangGraph-based multi-agent architecture with state management
+- **FR58:** System includes SupervisorAgent for routing queries to specialized agents
+- **FR59:** System includes MarketAnalysisAgent with tools: SearchNews, SearchReport, YouTubeSearch, ReportSentimentAnalysis, GraphQA
+- **FR60:** System includes FundamentalAnalysisAgent with tool: AnalysisFinancialStatement (5-year DART data)
+- **FR61:** System includes TechnicalAnalysisAgent with tools: AnalysisStock, PredictStock (Prophet+ARIMA ensemble), StockChartAnalysis
+- **FR62:** System includes InvestmentStrategyAgent with tools: GetAccountInfo, InvestmentStrategySearch
+- **FR63:** System can execute agent tools in parallel using asyncio.gather() for performance
+- **FR64:** System can enforce tool execution limits per agent (default: 5 tools max)
+- **FR65:** System can enforce agent recursion limits (default: 3 agent calls max)
+- **FR66:** System can extract stock name and code from user queries using fuzzy matching against KRX listings
+- **FR67:** System can retrieve Neo4j subgraph data (competitors, sectors) for context
+- **FR68:** System supports trading interruption workflow with user confirmation via LangGraph interrupt()
+- **FR69:** System can resume trading after user provides human_feedback=true/false
+- **FR70:** System uses AsyncPostgresSaver for LangGraph checkpoint persistence
+- **FR71:** System auto-refreshes expired KIS tokens and updates database
+- **FR72:** System caches global multi-agent graph instance for performance
+- **FR73:** Chat service operates in chat-only mode (portfolio separated to dedicated service)
 
 ### Ontology Management (Development Team)
 
-- **FR57:** Development team can create new event ontology categories
-- **FR58:** Development team can read existing event ontology definitions
-- **FR59:** Development team can update event ontology category definitions
-- **FR60:** Development team can delete event ontology categories
-- **FR61:** Development team can configure event extraction rules (keywords, entities, context)
-- **FR62:** Development team can test ontology definitions against historical news articles
-- **FR63:** Development team can validate event extraction samples
-- **FR64:** Development team can view accuracy metrics per ontology category
-- **FR65:** Development team can identify unmapped events flagged by system
-- **FR66:** Development team can deploy updated ontology to production
-- **FR67:** Development team can version ontology changes
-- **FR68:** Development team can analyze impact of ontology changes on users
+- **FR74:** Development team can create new event ontology categories
+- **FR75:** Development team can read existing event ontology definitions
+- **FR76:** Development team can update event ontology category definitions
+- **FR77:** Development team can delete event ontology categories
+- **FR78:** Development team can configure event extraction rules (keywords, entities, context)
+- **FR79:** Development team can test ontology definitions against historical news articles
+- **FR80:** Development team can validate event extraction samples
+- **FR81:** Development team can view accuracy metrics per ontology category
+- **FR82:** Development team can identify unmapped events flagged by system
+- **FR83:** Development team can deploy updated ontology to production
+- **FR84:** Development team can version ontology changes
+- **FR85:** Development team can analyze impact of ontology changes on users
 
 ### Compliance & Audit
 
-- **FR69:** System can embed disclaimers in all prediction outputs
-- **FR70:** System can embed disclaimers in all recommendation outputs
-- **FR71:** System can log prediction generation (timestamp, user, stock, output, confidence)
-- **FR72:** System can log which historical event patterns contributed to predictions
-- **FR73:** System can log knowledge graph state and ontology version used for predictions
-- **FR74:** System can log portfolio recommendations delivered to users
-- **FR75:** System can log backtesting executions
-- **FR76:** System can log event alerts sent to users
-- **FR77:** System can retain prediction logs for minimum 12 months
-- **FR78:** System can provide audit trail for prediction accountability
-- **FR79:** Users can view disclaimers explaining informational nature of platform
-- **FR80:** Users can access terms of service and privacy policy
+- **FR86:** System can embed disclaimers in all prediction outputs
+- **FR87:** System can embed disclaimers in all recommendation outputs
+- **FR88:** System can log prediction generation (timestamp, user, stock, output, confidence)
+- **FR89:** System can log which historical event patterns contributed to predictions
+- **FR90:** System can log knowledge graph state and ontology version used for predictions
+- **FR91:** System can log portfolio recommendations delivered to users
+- **FR92:** System can log backtesting executions
+- **FR93:** System can log event alerts sent to users
+- **FR94:** System can retain prediction logs for minimum 12 months
+- **FR95:** System can provide audit trail for prediction accountability
+- **FR96:** Users can view disclaimers explaining informational nature of platform
+- **FR97:** Users can access terms of service and privacy policy
 
 ### User Account & Authentication
 
