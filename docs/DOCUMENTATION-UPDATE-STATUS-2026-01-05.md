@@ -110,35 +110,35 @@ Comprehensive analysis of source code repositories (stockelper-kg, stockelper-ai
 
 ### Epics Document (epics.md)
 
-**Needs updates:**
+**Completed updates:**
 
-1. **Epic 0:** Already updated for DART 20 types (2026-01-04)
+1. **Epic 0:** ✅ Already updated for DART 20 types (2026-01-04)
 
-2. **Epic 1 (Event Intelligence):** Update Story 1.1a and 1.1b with:
-   - Dual crawler implementation (Naver + Toss)
-   - LLM-based extraction details
+2. **Epic 1 (Event Intelligence):** ✅ Updated (2026-01-05) with:
+   - LangGraph multi-agent architecture (5 agents, SSE streaming, trading interruption)
+   - Dual crawler implementation (Naver + Toss) in Story 1.1a
+   - LLM-based extraction with pre-classification rules
    - PostgreSQL event extraction table
-   - Pre-classification rules
+   - Story 1.1b already updated (2026-01-04)
 
-3. **Epic 2 (Portfolio):** Add comprehensive implementation details:
-   - Black-Litterman algorithm
-   - 11-factor ranking
-   - LangGraph workflows
-   - Buy/Sell decision making
-   - KIS API integration
+3. **Epic 2 (Portfolio):** ✅ Updated (2026-01-05) with:
+   - Black-Litterman 10-step pipeline
+   - 11-factor ranking system with parallel execution
+   - LangGraph Buy/Sell workflows with state management
+   - LLM-based InvestorView generation
+   - KIS API integration details
+   - Paper/Live trading modes
 
-4. **Epic 3 (Backtesting):** Add implementation details:
-   - Job queue system
-   - Async worker
-   - Notification system
-   - Dual endpoints
-   - Progress tracking
+4. **Epic 3 (Backtesting):** ✅ Updated (2026-01-05) with:
+   - Async job queue implementation (3 PostgreSQL tables)
+   - Polling-based async worker (5 sec interval)
+   - SELECT ... FOR UPDATE SKIP LOCKED concurrency
+   - Dual API endpoints (legacy + architecture-compatible)
+   - Status mapping with progress percentages
+   - JSONB flexible storage
+   - LLM parameter extraction
 
-5. **Epic 4 (Chat):** Update with:
-   - LangGraph multi-agent architecture
-   - 4 specialized agents
-   - SSE streaming
-   - Trading interruption
+5. **Epic 4 (Event Alerts):** No changes needed (already covers Supabase Realtime notifications)
 
 ### Stories
 
@@ -273,10 +273,10 @@ Comprehensive analysis of source code repositories (stockelper-kg, stockelper-ai
 ## 📊 Progress Metrics
 
 - **PRD:** ✅ 95% complete (all major sections updated)
-- **Architecture:** ⏳ 40% complete (DART section done, others pending)
-- **Epics:** ⏳ 20% complete (Story 1.1b updated, others pending)
-- **Stories:** ⏳ 0% complete (awaiting epic updates)
-- **Overall:** ⏳ 40% complete
+- **Architecture:** ✅ 90% complete (LLM, Portfolio, Backtesting sections added)
+- **Epics:** ✅ 75% complete (Epic 1, 2, 3 updated with implementation details)
+- **Stories:** ⏳ 25% complete (major epics updated, individual stories need acceptance criteria updates)
+- **Overall:** ✅ 70% complete
 
 ## 🎯 Estimated Completion
 

@@ -500,9 +500,9 @@ Development team validates existing LangChain v1.0+ StateGraph implementation an
 
 ### Epic 1: Event Intelligence Automation & Visualization
 
-Users see rich visualizations of event patterns and historical matches; system automatically processes news into events.
+Users see rich visualizations of event patterns and historical matches; system automatically processes news into events. Powered by LangGraph multi-agent system for intelligent chat interactions.
 
-**FRs covered:** FR1-FR8 (automation gaps), FR9-FR18 (visualization gaps), FR48-FR56 (UI enhancements)
+**FRs covered:** FR1-FR8 (automation gaps), FR9-FR18 (visualization gaps), FR48-FR56 (UI enhancements), FR57-FR73 (LLM multi-agent system)
 
 **Implementation Notes:**
 - Automated Airflow DAG for event extraction (currently manual CLI)
@@ -511,47 +511,97 @@ Users see rich visualizations of event patterns and historical matches; system a
 - Rich chat prediction cards
 - Suggested queries based on portfolio
 
-#### Story 1.1a: Automate News Event Extraction with Dual Pipeline (3-hour Schedule + CLI)
+**LangGraph Multi-Agent System (FR57-FR73):**
+- **Architecture:** LangGraph-based (NOT simple LangChain ReAct) with StateGraph pattern
+- **Agents:**
+  1. **SupervisorAgent:** Routes queries to specialized agents based on query type
+  2. **MarketAnalysisAgent:** SearchNews, SearchReport, YouTubeSearch, ReportSentimentAnalysis, GraphQA
+  3. **FundamentalAnalysisAgent:** AnalysisFinancialStatement (5-year DART data)
+  4. **TechnicalAnalysisAgent:** AnalysisStock, PredictStock (Prophet+ARIMA ensemble), StockChartAnalysis
+  5. **InvestmentStrategyAgent:** GetAccountInfo, InvestmentStrategySearch
+- **State Management:**
+  - @dataclass State: messages, query, agent_messages, agent_results (max 10), execute_agent_count (max 3), trading_action, stock_name, stock_code, subgraph
+  - Session-scoped memory only (no cross-session persistence)
+- **SSE Streaming (FR56a-FR56d):**
+  - Progress events: Show which agent is executing (start/end)
+  - Delta events: Token-level streaming for real-time response
+  - Final events: Complete message + subgraph + trading_action
+- **Key Features:**
+  - Trading interruption with LangGraph interrupt() for user confirmation
+  - AsyncPostgresSaver for checkpoint persistence (PostgreSQL)
+  - KIS token auto-refresh mechanism
+  - Chat-only mode (portfolio separated to dedicated service)
+  - Parallel tool execution via asyncio.gather()
+  - Tool execution limits (default: 5 per agent)
+  - Agent recursion limits (default: 3 calls)
+  - Stock name/code extraction from queries
+  - Neo4j subgraph retrieval for context
+- **Models:** All agents upgraded to GPT-5.1 (gpt-4o-mini)
+- **Port:** 21009
+
+#### Story 1.1a: Automate News Event Extraction with Dual Crawlers and LLM-Based Extraction
 
 **As a** user
-**I want** the system to automatically extract events from news articles with sentiment scores
-**So that** I receive timely event-based insights with sentiment analysis without delays
+**I want** the system to automatically extract events from news articles using dual crawlers and LLM-based extraction
+**So that** I receive timely event-based insights with accurate sentiment analysis from multiple news sources
 
 **Acceptance Criteria:**
 
-**Given** news articles scraped and stored in MongoDB by news crawler
+**Given** news articles collected from dual crawlers (Naver + Toss)
 **When** the news event extraction pipeline executes
 **Then** the following conditions are met:
 
+**Dual News Crawlers (FR1a-FR1f):**
+- **Naver Crawler:** Mobile API-based collection → MongoDB `naver_stock_news` collection
+- **Toss Crawler:** RESTful API-based collection → MongoDB `toss_stock_news` collections
+- Both crawlers run every 3 hours during market hours
+- Unique index on `articleUrl` prevents duplicate articles
+- Unprocessed articles marked with `processed: false` field
+
+**LLM-Based Event Extraction (FR2, FR2a-FR2h):**
+- Extract events using GPT-5.1 (OpenAI gpt-4o-mini) with NEWS-specific prompts (FR2a)
+- **Pre-classification:** Apply deterministic rules before LLM extraction for performance optimization (FR2f)
+- Extract sentiment score (-1.0 to +1.0 range) for each event (FR1, FR2)
+- **Slot Validation:** Validate extracted events against per-event-type schema with required + optional slots (FR2g)
+- Store extracted events in PostgreSQL `dart_event_extractions` table with JSONB slots (FR2h)
+- Assign source attribute "NEWS" to all extracted events (FR1c)
+- For dates with no events extracted, standardize sentiment score to 0 (FR2c)
+
 **Scheduled Pipeline (3-hour intervals):**
 - Airflow DAG executes every 3 hours (00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00) (FR1b)
-- DAG processes all unprocessed articles in MongoDB queue
-- Event extraction results stored in Neo4j knowledge graph with date indexing (FR4)
+- DAG processes all unprocessed articles from both MongoDB collections
+- Event extraction results stored in PostgreSQL `dart_event_extractions` table
+- Knowledge graph updated with new events (optional Neo4j upload)
 
 **Batch CLI (6-month backfill):**
 - CLI command can extract last 6 months of news data in single run (FR1a)
 - CLI: `stockelper-kg-events extract-news-batch --months=6`
 - CLI processes historical backfill without blocking scheduled pipeline
 
-**Event Extraction (both pipelines):**
-- Extract financial events from news with distinct NEWS-specific prompts (FR1, FR2a)
-- Extract sentiment score (-1 to 1 range) for each event (FR1)
-- Assign source attribute "NEWS" to all extracted events (FR1c)
-- Event metadata (entities, conditions, categories, dates, sentiment, source) captured correctly (FR5)
-- For dates with no events extracted, standardize sentiment score to 0 (FR2c)
+**Error Handling:**
 - Failed extractions retry up to 3 times with exponential backoff (NFR-R8)
 - DAG execution logs viewable in Airflow UI
 - Pipeline processes minimum 1000 news articles per hour (NFR-P9)
 
 **Database changes:**
-- MongoDB: Add `processed` boolean field and `processed_at` timestamp to news_articles collection
-- Neo4j: Add `sentiment` float property (-1 to 1) and `source` string property ("NEWS") to Event nodes
+- MongoDB:
+  - Collections: `naver_stock_news` and `toss_stock_news`
+  - Add `processed` boolean field and `processed_at` timestamp
+  - Unique index on `articleUrl`
+- PostgreSQL:
+  - Table: `dart_event_extractions` with columns: id, source_type (NEWS/DART), event_type, sentiment_score, slots (JSONB), extracted_at
+  - Index on (source_type, extracted_at)
+- Neo4j (optional): Add `sentiment` float property (-1 to 1) and `source` string property ("NEWS") to Event nodes
 
 **Files affected:**
+- `/stockelper-news-crawler/naver_crawler.py` (Naver mobile API crawler)
+- `/stockelper-news-crawler/toss_crawler.py` (Toss RESTful API crawler)
 - `/stockelper-airflow/dags/news_event_extraction_dag.py` (new scheduled DAG)
 - `/stockelper-kg/src/stockelper_kg/cli/extract_news_batch.py` (new CLI command)
+- `/stockelper-kg/src/stockelper_kg/extractors/llm_event_extractor.py` (LLM extraction with pre-classification)
 - `/stockelper-kg/src/stockelper_kg/prompts/news_event_extraction.py` (NEWS-specific prompts)
-- `/stockelper-news-crawler/` (MongoDB schema update)
+- `/stockelper-kg/src/stockelper_kg/validators/slot_validator.py` (slot schema validation)
+- `/stockelper-kg/migrations/003_create_event_extractions_table.sql` (PostgreSQL table)
 
 ---
 
@@ -799,9 +849,9 @@ Users see rich visualizations of event patterns and historical matches; system a
 
 ### Epic 2: Portfolio Management UI & Scheduled Recommendations
 
-Users manage portfolios through dedicated UI and receive daily personalized recommendations before market open.
+Users manage portfolios through dedicated UI and receive daily personalized recommendations before market open using Black-Litterman optimization and LangGraph workflows.
 
-**FRs covered:** FR19-FR28
+**FRs covered:** FR19-FR28, FR28a-FR28r
 
 **Implementation Notes:**
 - Frontend portfolio tracking interface (add/remove stocks, view holdings)
@@ -809,6 +859,35 @@ Users manage portfolios through dedicated UI and receive daily personalized reco
 - Scheduled 9:00 AM daily recommendation DAG (Airflow)
 - Notification delivery integration
 - Connect chat to existing PortfolioAnalysisAgent backend
+
+**Black-Litterman Portfolio Optimization (FR28a-FR28r):**
+- **11-Factor Ranking System:** Operating profit, net income, total liabilities, rise/fall rates, profitability, stability, growth, activity, volume, market cap
+- **Parallel Execution:** All 11 factors computed in parallel with rate limiting (20 req/sec)
+- **Normalized Scoring:** (n - rank + 1) / (n * (n+1) / 2) per factor
+- **LLM-Based InvestorViews:** GPT-5.1 generates expected returns (-20% to +20%) with confidence scores (0-1)
+- **10-Step Pipeline:**
+  1. Calculate returns covariance (252-day annualized)
+  2. Calculate market weights (score-based)
+  3. Calculate risk aversion (6% market premium / variance)
+  4. Calculate implied equilibrium returns (pi = delta * Sigma * w_mkt)
+  5. Construct view matrices (P, Q, Omega)
+  6. Calculate posterior returns (Black-Litterman formula with tau=0.025)
+  7. Optimize portfolio (SLSQP solver, constraints: sum=1.0, each ∈ [0, 0.3])
+  8. Calculate metrics (return, volatility, Sharpe ratio)
+  9. Filter weights < 0.001
+  10. Execute via KIS API (market orders)
+
+**LangGraph Buy/Sell Workflows:**
+- **Buy Workflow:** LoadUserContext → Ranking (11 factors, parallel) → Analysis (3 parallel nodes: WebSearch, FinancialStatement, TechnicalIndicator) → ViewGenerator (LLM-based InvestorViews) → PortfolioBuilder (Black-Litterman) → PortfolioTrader (KIS API)
+- **Sell Workflow:** LoadUserContext → GetPortfolioHoldings → Analysis (3 parallel nodes) → SellDecisionMaker (LLM evaluates 5 criteria: loss/profit thresholds, fundamentals, technicals, news, industry) → PortfolioSeller
+- **State Management:** BuyInputState, BuyPrivateState, BuyOutputState, SellInputState, SellPrivateState, SellOutputState
+- **Paper/Live Trading Modes:** Configurable via environment variables
+
+**KIS API Integration:**
+- KIS OpenAPI for trade execution (Buy/Sell orders)
+- Token auto-refresh mechanism
+- Paper trading mode for testing
+- Live trading with user credentials
 
 #### Story 2.1: Investment Profile Questionnaire During Sign-Up
 
@@ -1027,18 +1106,58 @@ Users manage portfolios through dedicated UI and receive daily personalized reco
 
 ### Epic 3: Backtesting Engine
 
-Users validate investment strategies through historical backtesting with Sharpe Ratio analysis.
+Users validate investment strategies through historical backtesting with async job queue processing and comprehensive results visualization.
 
-**FRs covered:** FR29-FR39
+**FRs covered:** FR29-FR39, FR39a-FR39r
 
 **Implementation Notes:**
 - Complete new implementation (100% new work)
 - Event-based strategy simulator
 - 3/6/12-month historical return calculation
 - Sharpe Ratio calculation and buy-and-hold comparison
-- Async job processing (5-10 minutes, PostgreSQL job queue)
+- Async job processing (5 minutes to 1 hour execution time)
+- PostgreSQL job queue with polling-based async worker
 - Frontend results visualization with charts
 - Notification on completion
+
+**Async Job Queue Implementation (FR39a-FR39r):**
+- **Database Tables:**
+  1. `backtest_jobs`: id, user_id, stock_ticker, strategy_type, status, input_json, error_message, retry_count, timestamps
+  2. `backtest_results`: id, job_id, user_id, results_json (JSONB), generated_at
+  3. `notifications`: id, user_id, type, title, message, data, is_read, timestamps
+- **Job Status Flow:** pending → in_progress → completed/failed
+- **Polling-Based Async Worker:**
+  - Default polling interval: 5 seconds
+  - SELECT ... FOR UPDATE SKIP LOCKED for concurrent-safe job reservation
+  - Exponential backoff on failures
+  - Finalizes success: insert result + update status + create notification
+  - Finalizes failure: store error + update status + create notification
+- **Dual API Endpoints:**
+  - Legacy: POST /backtesting/jobs, GET /backtesting/jobs/{id}
+  - Architecture-compatible: POST /api/backtesting/execute, GET /api/backtesting/{id}/status, GET /api/backtesting/{id}/result
+- **Status Mapping with Progress:**
+  - pending → queued (0%)
+  - in_progress → running (50%)
+  - completed → completed (100%)
+  - failed → failed (100%)
+- **Execution Time:**
+  - Simple 1-year backtest: ~5 minutes
+  - Complex multi-indicator strategy: Up to 1 hour
+- **JSONB Flexible Storage:** Results stored as structured JSONB in `backtest_results.results_json`
+- **User-Scoped Isolation:** All queries filtered by user_id
+
+**LLM Parameter Extraction (FR29a-FR29b):**
+- GPT-5.1 extracts backtesting parameters from chat input: universe (stock list), strategy (event-based strategy name)
+- If parameters clear: proceed directly to submission
+- If parameters unclear: LLM prompts user with follow-up questions (human-in-the-loop)
+- Chat responds: "Backtesting in progress. Navigate to [backtesting results page] to check status."
+
+**Results Visualization:**
+- Results NOT shown in chat interface
+- Dedicated backtesting results page with table/list format
+- Each row shows: stock name, strategy, status, creation timestamp
+- Clicking row opens LLM-generated Markdown report with charts and tables
+- Browser notification on completion (Confluence-style)
 
 #### Story 3.1: Backtesting Container Backend Infrastructure with LLM Parameter Extraction
 
