@@ -2486,6 +2486,115 @@ stockelper-llm/
         └── sample_data.py
 ```
 
+**LangGraph Multi-Agent Architecture (Actual Implementation):**
+
+The LLM service implements a sophisticated LangGraph-based multi-agent system, not a simple LangChain ReAct agent. The architecture consists of:
+
+**1. SupervisorAgent (Query Router)**
+- **File:** `src/multi_agent/supervisor_agent/agent.py`
+- **Purpose:** Routes user queries to specialized agents
+- **Routing Logic:**
+  - Validates agent existence
+  - Enforces prerequisite: InvestmentStrategyAgent only after 3 analysis agents complete
+  - Fallback to User response if routing fails
+  - Parallel stock name/code extraction using fuzzy matching with FDR.StockListing("KRX")
+- **Output:** Router(target="AgentName"|"User", message="...")
+
+**2. MarketAnalysisAgent**
+- **File:** `src/multi_agent/market_analysis_agent/`
+- **Tools:**
+  - `SearchNewsTool`: Perplexity API via OpenRouter
+  - `SearchReportTool`: Investment report search
+  - `YouTubeSearchTool`: YouTube content analysis
+  - `ReportSentimentAnalysisTool`: GPT-5.1 batch sentiment analysis with trend analysis
+  - `GraphQATool`: Neo4j knowledge graph QA with lazy initialization
+- **Features:** Batch processing for sentiment, temperature 0.0 for analysis
+
+**3. FundamentalAnalysisAgent**
+- **File:** `src/multi_agent/fundamental_analysis_agent/`
+- **Tools:**
+  - `AnalysisFinancialStatementTool`: 5-year DART 재무제표 analysis
+- **Data Source:** DART API with historical financial statements
+
+**4. TechnicalAnalysisAgent**
+- **File:** `src/multi_agent/technical_analysis_agent/`
+- **Tools:**
+  - `AnalysisStockTool`: Real-time KIS API stock data
+  - `PredictStockTool`: Ensemble prediction (Prophet + ARIMA) with 365-day forecast
+  - `StockChartAnalysisTool`: Chart image generation + LLM vision analysis with RSI/Stochastic indicators
+- **Prediction Strategy:** Average of Prophet and ARIMA predictions
+
+**5. InvestmentStrategyAgent**
+- **File:** `src/multi_agent/investment_strategy_agent/`
+- **Tools:**
+  - `GetAccountInfoTool`: KIS account balance/holdings with token auto-refresh
+  - `InvestmentStrategySearchTool`: Web search for investment strategies
+- **Token Management:** Detects expiration, auto-refreshes, updates DB, 1-time retry
+
+**State Management:**
+```python
+@dataclass
+class State:
+    messages: list  # Message history
+    query: str  # Original query
+    agent_messages: list  # Routed messages
+    agent_results: list  # Limited to 10 results
+    execute_agent_count: int  # Prevents infinite loops (max: 3)
+    trading_action: dict  # Trade recommendation
+    stock_name: str  # Extracted stock name
+    stock_code: str  # Stock code (KRX)
+    subgraph: dict  # Neo4j knowledge graph
+```
+
+**Graph Flow:**
+```
+supervisor → execute_agent (parallel tool execution via asyncio.gather())
+           → execute_trading (with interrupt for user confirmation)
+```
+
+**SSE Streaming Implementation:**
+- **Stream Modes:** ["custom", "values"]
+- **Event Types:**
+  - `progress`: {"type": "progress", "step": "agent_name", "status": "start|end"}
+  - `delta`: {"type": "delta", "token": "..."}  # Token-level streaming
+  - `final`: {"type": "final", "message": "...", "subgraph": {...}, "trading_action": {...}}
+  - `[DONE]`: Stream completion marker
+- **Token Generation:** Korean-aware tokenization via `langchain_compat.py`
+
+**Trading Interruption System:**
+- Uses LangGraph `interrupt()` for user confirmation
+- Request parameter: `human_feedback: bool`
+- Resume with: `Command(resume=human_feedback)`
+- Allows user to approve/reject trading actions
+
+**Key Features:**
+- **Parallel Tool Execution:** All agent tools run concurrently via `asyncio.gather()`
+- **Execution Limits:** Max 5 tools per agent, max 3 agent calls per query
+- **Global Caching:** `_CACHED_GRAPH` singleton for performance
+- **Checkpoint Persistence:** AsyncPostgresSaver with per-request connection pool
+- **KIS Token Auto-Refresh:** Automatic detection and refresh with DB update
+- **Chat-Only Mode:** Portfolio recommendations redirected to dedicated service
+- **Error Handling:** Custom SSE error responses with optional debug stack traces
+
+**Configuration:**
+```python
+config = {
+    "max_execute_agent_count": 3,
+    "user_id": user_id,
+    "thread_id": thread_id,
+    "configurable": {
+        "thread_id": thread_id,
+        "checkpoint_ns": "",
+        "checkpoint_id": None
+    }
+}
+```
+
+**Service Separation (Updated 2026-01-04):**
+- **LLM Service:** Chat-only (removed portfolio_multi_agent directory)
+- **Portfolio Service:** Separate repository at `stockelper-portfolio/` (port 21008)
+- **Backtesting Service:** Separate repository at `stockelper-backtesting/` (port 21011)
+
 ---
 
 #### **Repository 3: Knowledge Graph Builder (Python CLI)**
@@ -2643,6 +2752,298 @@ stockelper-airflow/
     └── test_dags/
         └── test_dag_validation.py
 ```
+
+---
+
+#### **Repository 6: Portfolio Service (FastAPI + LangGraph)**
+
+**Repository:** `stockelper-portfolio/`
+
+**Purpose:** Black-Litterman portfolio optimization with 11-factor ranking and LangGraph workflows for Buy/Sell decisions.
+
+**Technology Stack:** FastAPI, LangGraph, Python 3.12+, asyncpg, KIS OpenAPI, OpenAI GPT-5.1
+
+**Port:** 21008
+
+**LangGraph Workflow Architecture:**
+
+**Buy Workflow:**
+```
+LoadUserContext → Ranking (11 factors, parallel)
+    ↓
+Analysis (3 parallel nodes):
+    ├─ WebSearch
+    ├─ FinancialStatement
+    └─ TechnicalIndicator
+    ↓
+ViewGenerator (LLM-based InvestorViews)
+    ↓
+PortfolioBuilder (Black-Litterman optimization)
+    ↓
+PortfolioTrader (KIS API execution)
+```
+
+**Sell Workflow:**
+```
+LoadUserContext → GetPortfolioHoldings
+    ↓
+Analysis (3 parallel nodes)
+    ↓
+SellDecisionMaker (LLM-based decision: SELL/HOLD)
+    ↓
+PortfolioSeller (KIS API execution)
+```
+
+**State Management:**
+- **BuyInputState:** user_id, max_portfolio_size, rank_weights, risk_free_rate
+- **BuyPrivateState:** KIS credentials, analysis results, market data, investor views, stock scores
+- **BuyOutputState:** analysis results, portfolio result, trading result
+- **SellInputState:** user_id, loss_threshold, profit_threshold
+- **SellPrivateState:** holding stocks, analyses
+- **SellOutputState:** holdings, decisions, sell result
+
+**11-Factor Ranking System:**
+1. Operating Profit Rank
+2. Net Income Rank
+3. Total Liabilities Rank
+4. Rise Rate Rank
+5. Fall Rate Rank
+6. Profitability Rank
+7. Stability Rank
+8. Growth Rank
+9. Activity Rank
+10. Volume Rank
+11. Market Cap Rank
+
+**Ranking Features:**
+- Parallel execution with rate limiting (20 req/sec for KIS API)
+- Batch processing with 1-second waits between batches
+- Normalized scoring: `(n - rank + 1) / (n * (n+1) / 2)`
+- Weighted aggregation based on RankWeight configuration
+
+**Black-Litterman Model (10 Steps):**
+1. `calculate_returns_covariance()`: 252-day annualized from daily returns
+2. `calculate_market_weights()`: Score-based initial weights
+3. `calculate_risk_aversion()`: Market premium (6%) / variance
+4. `calculate_implied_equilibrium_returns()`: pi = delta * Sigma * w_mkt
+5. `construct_view_matrices()`: P (view selector), Q (expected returns), Omega (uncertainty)
+6. `calculate_posterior_returns()`: Black-Litterman formula with tau=0.025
+7. `optimize_portfolio()`: SLSQP solver with constraints
+8. `calculate_portfolio_metrics()`: Return, volatility, Sharpe ratio
+9. Filter: Exclude weights < 0.001
+10. Execute: KIS API market orders
+
+**Optimization Constraints:**
+- sum(weights) = 1.0
+- Each weight ∈ [0, 0.3] (max 30% per stock)
+- Market premium assumption: 6%
+
+**LLM-Based Components:**
+- **ViewGenerator:** GPT-5.1 generates InvestorView objects
+  - Expected returns: -20% to +20%
+  - Confidence: 0.0 to 1.0
+  - Reasoning: 2-3 sentences per stock
+- **SellDecisionMaker:** Evaluates 5 criteria
+  - Loss threshold (default: -10%)
+  - Profit threshold (default: +20%)
+  - Fundamental deterioration
+  - Technical signal deterioration
+  - Negative news/risk factors
+  - Industry outlook degradation
+  - Decision: SELL if 2+ criteria met
+
+**KIS API Integration:**
+- Auto-loads credentials from PostgreSQL
+- Token lifecycle management (auto-refresh)
+- Market orders only (no limit orders in MVP)
+- Paper trading and live trading modes
+- Transaction logging
+
+**API Endpoints:**
+- `POST /portfolio/recommendations` - Generate recommendations
+- `POST /portfolio/buy` - Execute buy workflow
+- `POST /portfolio/sell` - Execute sell workflow
+
+**Directory Structure:**
+```
+stockelper-portfolio/
+├── src/
+│   ├── main.py
+│   ├── routers/
+│   │   └── portfolio.py
+│   ├── portfolio_multi_agent/
+│   │   ├── __init__.py
+│   │   ├── builder.py                  # LangGraph workflow builder
+│   │   ├── state.py                    # State models
+│   │   ├── nodes/
+│   │   │   ├── load_user_context.py
+│   │   │   ├── ranking.py              # 11-factor ranking
+│   │   │   ├── analysis.py             # 3 parallel analyses
+│   │   │   ├── generate_views.py       # LLM InvestorViews
+│   │   │   ├── portfolio_builder.py    # Black-Litterman
+│   │   │   ├── portfolio_trader.py     # KIS execution
+│   │   │   ├── get_portfolio_holdings.py
+│   │   │   ├── sell_decision.py        # LLM sell decisions
+│   │   │   └── portfolio_seller.py
+│   │   └── rank_func/                  # 11 ranking functions
+│   │       ├── operating_profit.py
+│   │       ├── net_income.py
+│   │       └── ... (9 more)
+│   └── tests/
+│       ├── test_core_logic.py          # PortfolioBuilder unit tests
+│       └── test_portfolio_endpoints_mocked.py
+└── README.md
+```
+
+---
+
+#### **Repository 7: Backtesting Service (FastAPI + Async Worker)**
+
+**Repository:** `stockelper-backtesting/`
+
+**Purpose:** Async job queue system for backtesting with polling worker and notification support.
+
+**Technology Stack:** FastAPI, Python 3.12+, asyncpg (PostgreSQL), async worker pattern
+
+**Port:** 21011
+
+**Async Job Queue Architecture:**
+
+```
+Client Request
+    ↓
+POST /api/backtesting/execute
+    ↓
+Create Job (status=pending) → backtest_jobs table
+    ↓ (return job_id immediately)
+Async Worker (polling every 5 seconds)
+    ↓
+SELECT ... FOR UPDATE SKIP LOCKED (concurrent-safe)
+    ↓
+Update status=in_progress
+    ↓
+Execute Backtest Simulation
+    ↓
+On Success:
+    ├─ Insert result → backtest_results
+    ├─ Update status=completed
+    └─ Create notification
+    ↓
+On Failure:
+    ├─ Store error_message
+    ├─ Update status=failed
+    └─ Create notification
+```
+
+**Database Schema:**
+
+**1. backtest_jobs:**
+```sql
+CREATE TABLE backtest_jobs (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    stock_ticker VARCHAR(20) NOT NULL,
+    strategy_type VARCHAR(100),
+    status VARCHAR(20),  -- pending | in_progress | completed | failed
+    input_json JSONB,
+    error_message TEXT,
+    retry_count INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ
+);
+CREATE INDEX idx_backtest_jobs_user ON backtest_jobs(user_id);
+CREATE INDEX idx_backtest_jobs_status ON backtest_jobs(status);
+```
+
+**2. backtest_results:**
+```sql
+CREATE TABLE backtest_results (
+    id SERIAL PRIMARY KEY,
+    job_id INT REFERENCES backtest_jobs(id) ON DELETE CASCADE,
+    user_id INT NOT NULL,
+    stock_ticker VARCHAR(20),
+    strategy_type VARCHAR(100),
+    results_json JSONB,  -- Flexible result storage
+    generated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**3. notifications:**
+```sql
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    type VARCHAR(50),  -- backtesting_complete | backtesting_failed
+    title TEXT,
+    message TEXT,
+    data JSONB,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    read_at TIMESTAMPTZ
+);
+```
+
+**Worker Implementation:**
+- **Pattern:** Polling-based async worker
+- **Interval:** 5 seconds (configurable)
+- **Concurrency:** SELECT ... FOR UPDATE SKIP LOCKED prevents conflicts
+- **Exponential Backoff:** Reduces polling frequency during idle periods
+- **MVP Simulation:** Configurable sleep duration (default: 300 seconds)
+
+**API Endpoints:**
+
+**Legacy Format:**
+- `POST /backtesting/jobs` - Create job
+- `GET /backtesting/jobs/{job_id}?user_id=...` - Get job with result
+
+**Architecture-Compatible Format:**
+- `POST /api/backtesting/execute` - Create job, returns: `{job_id, status="queued"}`
+- `GET /api/backtesting/{job_id}/status?user_id=...` - Status with progress percentage
+- `GET /api/backtesting/{job_id}/result?user_id=...` - Result retrieval (only if completed)
+
+**Status Mapping:**
+```python
+def _map_job_status(db_status):
+    mapping = {
+        "pending": ("queued", 0),
+        "in_progress": ("running", 50),
+        "completed": ("completed", 100),
+        "failed": ("failed", 100)
+    }
+    return mapping.get(db_status, ("unknown", 0))
+```
+
+**Key Features:**
+- **User-Scoped Isolation:** All queries filtered by user_id
+- **JSONB Flexibility:** Input parameters and results stored as JSON
+- **Notification System:** Automatic alerts on job completion/failure
+- **Progress Tracking:** Implicit progress via status mapping
+- **Error Handling:** error_message field for debugging
+- **Retry Support:** retry_count field for future retry logic
+
+**Directory Structure:**
+```
+stockelper-backtesting/
+├── src/
+│   ├── main.py
+│   ├── worker.py                       # Async polling worker
+│   ├── routers/
+│   │   └── backtesting.py              # Dual endpoints
+│   ├── backtesting/
+│   │   └── job_queue.py                # Job CRUD operations
+│   ├── notifications/
+│   │   └── service.py                  # Notification creation
+│   └── persistence/
+│       └── schema.py                   # Database schema definitions
+└── tests/
+    └── test_backtesting/
+```
+
+**Docker Services:**
+- **backtesting-server:** API server (port 21011)
+- **backtest-worker:** Async worker (separate container)
+- Worker waits for server health check before starting
 
 ---
 
