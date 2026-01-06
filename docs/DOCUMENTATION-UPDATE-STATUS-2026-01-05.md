@@ -270,13 +270,18 @@ Comprehensive analysis of source code repositories (stockelper-kg, stockelper-ai
 4. **Verify Consistency:** Cross-check all documents for alignment
 5. **Commit Changes:** Create comprehensive commit with all documentation updates
 
-## 📊 Progress Metrics
+## 📊 Progress Metrics (Updated 2026-01-05)
 
-- **PRD:** ✅ 95% complete (all major sections updated)
+- **PRD:** ✅ 95% complete (all major sections updated with 50+ new FRs)
 - **Architecture:** ✅ 90% complete (LLM, Portfolio, Backtesting sections added)
 - **Epics:** ✅ 75% complete (Epic 1, 2, 3 updated with implementation details)
-- **Stories:** ⏳ 25% complete (major epics updated, individual stories need acceptance criteria updates)
-- **Overall:** ✅ 70% complete
+- **Stories:** ✅ 40% complete (critical stories 2.4, 3.1 updated with detailed acceptance criteria)
+- **Overall:** ✅ 75% complete
+
+**Story Updates Completed:**
+- ✅ Story 1.1a: Dual crawlers and LLM extraction
+- ✅ Story 2.4: Portfolio recommendations with Black-Litterman workflow
+- ✅ Story 3.1: Backtesting container with async job queue
 
 ## 🎯 Estimated Completion
 
