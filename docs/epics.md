@@ -1000,7 +1000,7 @@ Users manage portfolios through dedicated UI and receive daily personalized reco
 
 **Generation & Real-Time Updates (FR109, FR110):**
 - Page displays "Generate Recommendation" button prominently
-- Clicking button triggers portfolio analysis via existing PortfolioAnalysisAgent (gpt-5.1)
+- Clicking button triggers portfolio analysis via LangGraph Buy workflow (gpt-5.1)
 - Status transitions: PENDING → IN_PROGRESS → COMPLETED/FAILED (FR117)
 - Loading state shows progress indicator with message "Analyzing recent events..." (async UX pattern)
 - Recommendations complete within 1-3 minutes (per meeting notes)
@@ -1008,6 +1008,29 @@ Users manage portfolios through dedicated UI and receive daily personalized reco
 - Results NOT shown directly in chat (appear on this page only)
 - Frontend subscribes to Supabase Realtime for `portfolio_recommendations` table changes (FR104, FR107)
 - UI updates in real-time when status changes (no manual refresh required)
+
+**Black-Litterman Workflow Implementation (FR28a-FR28r):**
+- **LangGraph Buy Workflow Execution:**
+  1. LoadUserContext → Load user portfolio, risk tolerance, investment horizon
+  2. Ranking → Execute 11-factor ranking in parallel (operating profit, net income, liabilities, rise/fall rates, profitability, stability, growth, activity, volume, market cap)
+  3. Analysis → 3 parallel nodes: WebSearch (news), FinancialStatement (5-year DART), TechnicalIndicator (Prophet+ARIMA)
+  4. ViewGenerator → LLM generates InvestorViews (expected returns: -20% to +20%, confidence: 0-1)
+  5. PortfolioBuilder → Black-Litterman optimization with SLSQP solver
+  6. PortfolioTrader → Execute trades via KIS API (paper/live mode)
+- **Parallel Execution:** 11 factors ranked in parallel with rate limiting (20 req/sec)
+- **Normalized Scoring:** (n - rank + 1) / (n * (n+1) / 2) per factor
+- **Black-Litterman 10 Steps:**
+  1. Calculate returns covariance (252-day annualized)
+  2. Calculate market weights (score-based)
+  3. Calculate risk aversion (6% market premium / variance)
+  4. Calculate implied equilibrium returns (pi = delta * Sigma * w_mkt)
+  5. Construct view matrices (P, Q, Omega)
+  6. Calculate posterior returns (Black-Litterman formula with tau=0.025)
+  7. Optimize portfolio (SLSQP, constraints: sum=1.0, each ∈ [0, 0.3])
+  8. Calculate metrics (return, volatility, Sharpe ratio)
+  9. Filter weights < 0.001
+  10. Generate Markdown report with recommendations
+- **State Management:** BuyInputState (user_id, universe), BuyPrivateState (rankings, analysis results), BuyOutputState (portfolio weights, report)
 
 **Accumulated History Display (FR111, FR112, FR113, FR114):**
 - Page displays table/list of ALL previous recommendations sorted by most recent first (FR111)
@@ -1062,8 +1085,19 @@ Users manage portfolios through dedicated UI and receive daily personalized reco
 - `/stockelper-fe/src/components/recommendations/markdown-report-viewer.tsx` (new component)
 - `/stockelper-fe/src/app/api/recommendations/generate/route.ts` (triggers agent, returns immediately)
 - `/stockelper-fe/src/hooks/useSupabaseRealtimeSubscription.ts` (new hook for Supabase Realtime)
-- `/stockelper-llm/src/agents/portfolio_recommendation_agent.py` (writes to PostgreSQL, manages status)
+- **Portfolio Service (LangGraph Buy Workflow):**
+  - `/stockelper-portfolio/src/portfolio_multi_agent/buy/graph.py` (Buy workflow StateGraph definition)
+  - `/stockelper-portfolio/src/portfolio_multi_agent/buy/state.py` (BuyInputState, BuyPrivateState, BuyOutputState)
+  - `/stockelper-portfolio/src/portfolio_multi_agent/buy/nodes/ranking.py` (11-factor ranking node)
+  - `/stockelper-portfolio/src/portfolio_multi_agent/buy/nodes/view_generator.py` (LLM InvestorView generation)
+  - `/stockelper-portfolio/src/portfolio_multi_agent/buy/nodes/portfolio_builder.py` (Black-Litterman optimization)
+  - `/stockelper-portfolio/src/portfolio_multi_agent/buy/nodes/portfolio_trader.py` (KIS API execution)
+  - `/stockelper-portfolio/src/routers/portfolio_router.py` (API endpoints: POST /api/portfolio/buy)
 - Database migration script for `portfolio_recommendations` table with Supabase Realtime
+
+**Implementation Reference:**
+- Complete Buy workflow: `docs/architecture.md` Lines 2758-2896
+- Black-Litterman formulas: Architecture Repository 6 section
 
 ---
 
@@ -1178,14 +1212,37 @@ Users validate investment strategies through historical backtesting with async j
 - Example follow-up: "Which stocks would you like to backtest?" or "Which strategy: event-driven buy, sentiment-based, or pattern-matching?"
 - Chat responds with "Backtesting in progress. Navigate to [backtesting results page] to check status." (FR29c)
 
-**Backtesting Container Backend (FR30a, FR30b):**
+**Backtesting Container Backend (FR30a, FR30b, FR39a-FR39r):**
 - Backtesting runs in separate container backend (NOT in LLM server)
 - LLM sends backtesting parameters (universe, strategy, user_id) to backtesting container via API
-- Backtesting container: standalone service (reference code provided separately)
-- Container processes backtesting request asynchronously
-- PostgreSQL `backtest_jobs` table stores job metadata (user_id, universe, strategy, status, created_at, completed_at)
-- Job status tracked as enum: pending, processing, completed, failed
-- Backtesting execution completes within 10 seconds for single stock (NFR-P4)
+- Backtesting container: standalone service running on port 21011
+- Container processes backtesting request asynchronously via PostgreSQL job queue
+- **Async Job Queue Architecture:**
+  - PostgreSQL tables: `backtest_jobs`, `backtest_results`, `notifications` (FR39a-FR39d)
+  - Job status flow: pending → in_progress → completed/failed (FR39e)
+  - Polling-based async worker with 5-second interval (FR39f)
+  - **SELECT ... FOR UPDATE SKIP LOCKED** for concurrent-safe job reservation (FR39g)
+  - Worker loop: Poll pending jobs → Reserve job → Execute backtest → Finalize (success/failure)
+  - Exponential backoff on failures with max retry_count (FR39h)
+  - Success finalization: Insert `backtest_results` + Update status to completed + Create notification (FR39i)
+  - Failure finalization: Store error_message + Update status to failed + Create notification (FR39j)
+- **Dual API Endpoints (FR39k-FR39l):**
+  - Legacy: POST /backtesting/jobs, GET /backtesting/jobs/{id}
+  - Architecture-compatible: POST /api/backtesting/execute, GET /api/backtesting/{id}/status, GET /api/backtesting/{id}/result
+- **Status Mapping Function (FR39m):**
+  ```python
+  def _map_job_status(db_status):
+      mapping = {
+          "pending": ("queued", 0),
+          "in_progress": ("running", 50),
+          "completed": ("completed", 100),
+          "failed": ("failed", 100)
+      }
+      return mapping.get(db_status, ("unknown", 0))
+  ```
+- **Execution Time:** Simple 1-year backtest ~5 minutes, Complex strategy up to 1 hour (FR39n)
+- **JSONB Storage:** Results stored as structured JSONB in `backtest_results.results_json` (FR39o)
+- **User-Scoped Isolation:** All queries filtered by user_id (FR39p)
 
 **Notification & Results - Supabase Realtime (FR31a, FR31b, FR31c, FR104-FR108, FR121-FR125):**
 - Backtesting container writes results to PostgreSQL on AWS t3.medium when job completes (FR31a)
@@ -1244,15 +1301,23 @@ Users validate investment strategies through historical backtesting with async j
 **Files affected:**
 - `/stockelper-llm/src/api/backtesting.py` (LLM parameter extraction logic)
 - `/stockelper-llm/src/agents/backtesting_agent.py` (human-in-the-loop prompting)
-- **Backtesting Container (reference code provided separately):**
-  - Backtesting service repository (standalone container)
-  - API endpoints: POST /backtest/execute, GET /backtest/{job_id}/status
-  - Writes to PostgreSQL on AWS t3.medium, manages status transitions
+- **Backtesting Service (Async Job Queue):**
+  - `/stockelper-backtesting/src/backtesting/models.py` (Database models: BacktestJob, BacktestResult, Notification)
+  - `/stockelper-backtesting/src/backtesting/worker.py` (Polling-based async worker with SELECT...FOR UPDATE SKIP LOCKED)
+  - `/stockelper-backtesting/src/backtesting/executor.py` (Backtest execution logic)
+  - `/stockelper-backtesting/src/routers/backtesting_router.py` (API endpoints)
+  - `/stockelper-backtesting/src/utils/status_mapper.py` (Status mapping function)
+  - `/stockelper-backtesting/alembic/versions/001_create_backtest_tables.py` (Database migrations)
 - `/stockelper-fe/src/app/backtesting/results/page.tsx` (new results page with table/list + Markdown viewer)
 - `/stockelper-fe/src/components/backtesting/backtest-table.tsx` (new component)
 - `/stockelper-fe/src/components/backtesting/markdown-report-viewer.tsx` (reuse from portfolio)
 - `/stockelper-fe/src/hooks/useSupabaseRealtimeSubscription.ts` (shared hook for Supabase Realtime)
 - Database migration scripts for `backtest_jobs` table with Supabase Realtime
+
+**Implementation Reference:**
+- Complete async job queue architecture: `docs/architecture.md` Lines 2900-3046
+- Database schemas with full SQL: Architecture Repository 7 section
+- Worker implementation and status mapping: Architecture backtesting section
 
 ---
 
