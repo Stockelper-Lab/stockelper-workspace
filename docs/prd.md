@@ -28,10 +28,11 @@ Stockelper is evolving from an AI-powered stock analysis platform into an intell
 **Current System Capabilities:**
 - LangGraph-based multi-agent LLM system with 4 specialized agents (MarketAnalysis, FundamentalAnalysis, TechnicalAnalysis, InvestmentStrategy)
 - Neo4j knowledge graph with expanded event ontology (CAPITAL_RAISE, CAPITAL_RETURN, CAPITAL_STRUCTURE_CHANGE, LISTING_STATUS_CHANGE, and more)
-- Dual-source data collection: DART (20 major report types → PostgreSQL) + News (Naver + Toss → MongoDB)
-- LLM-based event extraction with sentiment scoring (-1.0 to +1.0) using GPT-5.1
-- Real-time data integration (DART API, KIS OpenAPI, News crawlers)
-- Automated data pipeline with 6 production DAGs (Apache Airflow)
+- DART data collection: 20 major report types → PostgreSQL with financial metrics extraction
+- **[UPDATED 2025-01-06]** Direct use of DART disclosure categories as events with calculated metrics (replaces sentiment-based approach)
+- **[POSTPONED 2025-01-06]** News data collection (Naver + Toss crawlers) - to be implemented in future phases
+- Real-time data integration (DART API, KIS OpenAPI)
+- Automated data pipeline with production DAGs (Apache Airflow)
 - Black-Litterman portfolio optimization with 11-factor ranking system
 - Async job queue system for backtesting with notification support
 - Modern web interface with JWT authentication and Supabase Realtime
@@ -73,6 +74,32 @@ New capabilities integrate naturally with existing architecture:
 
 **The "Finally!" Moment:**
 When users realize the system not only predicts based on similar past events, but automatically provides portfolio recommendations daily and backtests their holdings without manual configuration—moving from "tool I use" to "intelligent assistant that anticipates my needs."
+
+## ⏸️ POSTPONED Features (2025-01-06 Meeting)
+
+The following features have been postponed based on architectural decisions made in the **2025-01-06 meeting** (see `docs/references/20250106.md`):
+
+**News-Based Event Extraction:**
+- Dual news crawlers (Naver + Toss): FR1, FR1a-FR1f
+- LLM-based event extraction from news: FR2a (news portion)
+- Sentiment scoring from news articles: All sentiment references in FR1-FR2
+- MongoDB storage for news: Collections `naver_stock_news` and `toss_stock_news` postponed
+
+**Rationale:**
+System will initially use DART disclosure categories directly as events with calculated financial metrics (see FR2i-FR2z). This provides more quantitative, reliable data for backtesting. News-based extraction will be implemented in future phases when the metrics-based approach is validated.
+
+**Future Scope:**
+- News crawler ontology documentation preserved for future implementation
+- Sentiment analysis logic preserved for future use
+- MongoDB collections can be activated when news features resume
+- LLM-based extraction framework can be extended to news data
+
+**Current Focus:**
+- DART disclosure financial metrics extraction (FR2i-FR2z)
+- Metric-based backtesting (FR39s-FR39v)
+- Direct category-to-event mapping (16 disclosure types)
+
+---
 
 ## Project Classification
 
@@ -1126,22 +1153,120 @@ Stockelper's MVP focuses on building the foundational platform infrastructure—
 
 ### Event Intelligence & Knowledge Graph
 
-- **FR1:** System can extract financial events from Korean news articles with sentiment score (-1 to 1 range) using dual crawlers (Naver + Toss)
-- **FR1a:** System can collect news data via dual crawlers: Naver (mobile API-based) and Toss (RESTful API-based)
-- **FR1b:** System can store news articles in MongoDB with collections: `naver_stock_news` and `toss_stock_news`
-- **FR1c:** System can prevent duplicate news articles using unique index on `articleUrl`
-- **FR1d:** System can extract news data via CLI for historical backfill
-- **FR1e:** System can collect news data on scheduled intervals via Airflow DAGs
-- **FR1f:** System can assign source attribute "NEWS" to all news-extracted events
-- **FR2:** System can extract financial events from DART disclosure data using GPT-5.1 with sentiment score (-1 to 1 range)
-- **FR2a:** System can use LLM-based extraction with distinct prompts for DART vs NEWS data
-- **FR2b:** System can assign source attribute "DART" to all DART-extracted events
-- **FR2c:** System can standardize sentiment score to 0 for dates with no extracted events
+**[POSTPONED - 2025-01-06]** News-based event extraction postponed. System will focus on DART disclosure metrics (see FR2i-FR2z).
+
+- **FR1:** **[POSTPONED]** System can extract financial events from Korean news articles with sentiment score (-1 to 1 range) using dual crawlers (Naver + Toss)
+- **FR1a:** **[POSTPONED]** System can collect news data via dual crawlers: Naver (mobile API-based) and Toss (RESTful API-based)
+- **FR1b:** **[POSTPONED]** System can store news articles in MongoDB with collections: `naver_stock_news` and `toss_stock_news`
+- **FR1c:** **[POSTPONED]** System can prevent duplicate news articles using unique index on `articleUrl`
+- **FR1d:** **[POSTPONED]** System can extract news data via CLI for historical backfill
+- **FR1e:** **[POSTPONED]** System can collect news data on scheduled intervals via Airflow DAGs
+- **FR1f:** **[POSTPONED]** System can assign source attribute "NEWS" to all news-extracted events
+- **FR2:** **[UPDATED - 2025-01-06]** System uses DART disclosure categories directly as events with calculated financial metrics (not sentiment scores). **Note:** This requirement currently applies ONLY to DART disclosures. News-based event extraction with sentiment scoring is POSTPONED (2025-01-06 meeting).
+- **FR2a:** **[POSTPONED for NEWS]** System can use LLM-based extraction with distinct prompts for DART vs NEWS data. Currently: DART metrics calculation only, NEWS extraction postponed.
+- **FR2b:** System can assign source attribute "DART" to all DART disclosure metrics
+- **FR2c:** **[POSTPONED]** System can standardize sentiment score to 0 for dates with no extracted events. (Sentiment scoring postponed - using metrics instead)
 - **FR2d:** System can classify DART events into 6 major categories: (1) Capital Changes, (2) Bond Issuance, (3) Treasury Stock, (4) Business Operations, (5) Securities Transactions, (6) M&A/Restructuring
 - **FR2e:** System can extract event context from DART disclosures: amount, market cap ratio, purpose, timing
-- **FR2f:** System can use deterministic pre-classification rules before LLM extraction for performance optimization
-- **FR2g:** System can validate extracted events against slot schema per event type (required + optional slots)
-- **FR2h:** System can store extracted DART events in PostgreSQL table `dart_event_extractions` with JSONB slots
+- **FR2f:** **[POSTPONED for NEWS]** System can use deterministic pre-classification rules before LLM extraction for performance optimization. Currently: Applies to DART metrics calculation, NEWS postponed.
+- **FR2g:** **[POSTPONED for NEWS]** System can validate extracted events against slot schema per event type (required + optional slots). Currently: Applies to DART metrics validation, NEWS postponed.
+- **FR2h:** **[MODIFIED - 2025-01-06]** System stores calculated DART disclosure metrics in PostgreSQL table `dart_disclosure_metrics` (replaces `dart_event_extractions`). See FR2i-FR2z for metrics details.
+
+**FR2i-FR2z: DART Financial Metrics Extraction (NEW - 2025-01-06)**
+
+**Meeting Reference:** 2025-01-06 meeting decision (see `docs/references/20250106.md`)
+
+- **FR2i:** System extracts financial metrics from 16 DART disclosure types for backtesting (types: 6, 7, 8, 9, 16, 17, 21-26, 29-30, 33-36)
+- **FR2j:** System calculates disclosure-specific metrics using API-provided fields and market cap data
+- **FR2k:** System stores calculated metrics in PostgreSQL `dart_disclosure_metrics` table with JSONB format
+- **FR2l:** Metrics available for backtesting condition specification via API queries
+- **FR2m:** System supports user-defined backtesting conditions based on metric thresholds
+- **FR2n:** (Future) System recommends optimal backtesting conditions using LLM agent analysis
+
+**FR2i-1: 증자/감자 (Capital Changes) Metrics - Disclosure Types 6, 7, 8, 9**
+
+- **FR2i-1a:** For 유상증자 (Type 6): Calculate 조달비율 = (fdpp_fclt + fdpp_op + fdpp_dtrp + fdpp_ocsa + fdpp_etc) / 시가총액
+- **FR2i-1b:** For 유상증자 (Type 6): Calculate 희석률 = nstk_ostk_cnt / bfic_tisstk_ostk
+- **FR2i-1c:** For 무상증자 (Type 7): Extract 배정비율 = nstk_ascnt_ps_ostk (direct from API)
+- **FR2i-1d:** For 감자 (Type 9): Extract 감자비율 = cr_rt_ostk (direct from API)
+- **FR2i-1e:** For 감자 (Type 9): Calculate 자본금감소율 = (bfcr_cpt - atcr_cpt) / bfcr_cpt
+- **FR2i-1f:** For 유무상증자 (Type 8): Calculate combined metrics from both 유상 and 무상 formulas
+
+**FR2i-2: 전환사채/BW (Convertible Bonds) Metrics - Disclosure Types 16, 17**
+
+- **FR2i-2a:** For CB (Type 16): Calculate CB_발행비율 = bd_fta / 시가총액
+- **FR2i-2b:** For CB (Type 16): Extract CB_전환희석률 = cvisstk_tisstk_vs (direct from API)
+- **FR2i-2c:** For CB (Type 16): Calculate 전환가괴리율 = (현재주가 - cv_prc) / 현재주가
+- **FR2i-2d:** For BW (Type 17): Calculate BW_발행비율 = bd_fta / 시가총액
+- **FR2i-2e:** For BW (Type 17): Extract BW_희석률 = nstk_isstk_tisstk_vs (direct from API)
+
+**FR2i-3: 자기주식 (Treasury Stock) Metrics - Disclosure Types 21-24**
+
+- **FR2i-3a:** For 취득 (Type 21): Calculate 취득금액비율 = aqpln_prc_ostk / 시가총액
+- **FR2i-3b:** For 취득 (Type 21): Calculate 취득주식비율 = aqpln_stk_ostk / 발행주식총수
+- **FR2i-3c:** For 처분 (Type 22): Calculate 처분금액비율 = dppln_prc_ostk / 시가총액
+- **FR2i-3d:** For 처분 (Type 22): Calculate 처분주식비율 = dppln_stk_ostk / 발행주식총수
+- **FR2i-3e:** For 신탁체결 (Type 23): Calculate 신탁체결비율 = ctr_prc / 시가총액
+- **FR2i-3f:** For 신탁해지 (Type 24): Calculate 신탁해지비율 = ctr_prc_bfcc / 시가총액
+
+**FR2i-4: 영업양수도 (Business Transfer) Metrics - Disclosure Types 25-26**
+
+- **FR2i-4a:** For 영업양수 (Type 25): Calculate 양수가액비율 = inh_prc / 시가총액
+- **FR2i-4b:** For 영업양수 (Type 25): Extract 자산비중 = ast_rt (direct from API)
+- **FR2i-4c:** For 영업양도 (Type 26): Calculate 양도가액비율 = trf_prc / 시가총액
+- **FR2i-4d:** For 영업양도 (Type 26): Extract 자산비중 = ast_rt (direct from API)
+
+**FR2i-5: 타법인주식 (Other Company Stocks) Metrics - Disclosure Types 29-30**
+
+- **FR2i-5a:** For 양수 (Type 29): Calculate 금액비율 = inhdtl_inhprc / 시가총액
+- **FR2i-5b:** For 양수 (Type 29): Extract 총자산대비 = inhdtl_tast_vs (direct from API)
+- **FR2i-5c:** For 양수 (Type 29): Extract 자기자본대비 = inhdtl_ecpt_vs (direct from API)
+- **FR2i-5d:** For 양도 (Type 30): Calculate 금액비율 = trfdtl_trfprc / 시가총액
+- **FR2i-5e:** For 양도 (Type 30): Extract 총자산대비 = trfdtl_tast_vs (direct from API)
+
+**FR2i-6: 합병/분할 (M&A) Metrics - Disclosure Types 33-36**
+
+- **FR2i-6a:** For 합병 (Type 33): Extract 합병비율 = mg_rt (direct from API)
+- **FR2i-6b:** For 합병 (Type 33): Calculate 피합병사자본대비 = rbsnfdtl_teqt / 당사자기자본
+- **FR2i-6c:** For 분할 (Type 34): Extract 분할비율 = dv_rt (direct from API)
+- **FR2i-6d:** For 분할 (Type 34): Calculate 분할후자본비율 = ffdtl_teqt / atdvfdtl_teqt
+- **FR2i-6e:** For 분할합병 (Type 35): Extract 분할합병비율 = dvmg_rt (direct from API)
+- **FR2i-6f:** For 주식교환이전 (Type 36): Extract 교환이전비율 = extr_rt (direct from API)
+
+**FR2k: Metrics Storage Schema**
+
+- Table name: `dart_disclosure_metrics`
+- **FR2k-1:** Store rcept_no (receipt number, UNIQUE) as primary disclosure identifier
+- **FR2k-2:** Store corp_code (8-digit) and stock_code (6-digit) for company identification
+- **FR2k-3:** Store disclosure_type (Korean name) and disclosure_type_code (numeric code 6-36)
+- **FR2k-4:** Store calculated metrics as JSONB with metric names as keys
+- **FR2k-5:** Store market_cap (DECIMAL) used in calculations for audit trail
+- **FR2k-6:** Store rcept_dt (disclosure date) for temporal queries
+- **FR2k-7:** Create index on (stock_code, rcept_dt DESC) for fast backtesting queries
+- **FR2k-8:** Create index on disclosure_type_code for filtering by type
+- **FR2k-9:** Create index on rcept_no for unique lookup
+
+**FR2l: Backtesting Integration**
+
+- **FR2l-1:** Metrics accessible via SQL queries from backtesting service
+- **FR2l-2:** Support JSONB operators for metric filtering (e.g., `metrics->>'유상증자_조달비율' > 0.1`)
+- **FR2l-3:** Return (stock_code, rcept_dt) tuples matching user-defined conditions
+- **FR2l-4:** Calculate returns following metric-triggering disclosure events (1, 3, 6, 12 months)
+
+**FR2m: User-Defined Backtesting Conditions**
+
+- **FR2m-1:** Users specify metric name, operator (>, <, >=, <=, =), and threshold value
+- **FR2m-2:** Support AND/OR logical combinations of multiple metric conditions
+- **FR2m-3:** Example: "유상증자_조달비율 > 0.1 AND 희석률 < 0.05"
+- **FR2m-4:** System translates natural language conditions to SQL WHERE clauses
+
+**FR2n: Agent-Recommended Conditions (Future Enhancement)**
+
+- **FR2n-1:** Agent analyzes historical metric distributions across all disclosures
+- **FR2n-2:** Agent identifies statistically significant threshold values
+- **FR2n-3:** Agent provides confidence scores (0-1) for recommended conditions
+- **FR2n-4:** Agent explains rationale for each recommended threshold
+
 - **FR3:** System can classify extracted events into defined ontology categories
 - **FR4:** System can store events in Neo4j knowledge graph with date indexing
 - **FR5:** System can capture event metadata (entities, conditions, categories, dates)
