@@ -539,7 +539,17 @@ Users see rich visualizations of event patterns and historical matches; system a
 - **Models:** All agents upgraded to GPT-5.1 (gpt-4o-mini)
 - **Port:** 21009
 
-#### Story 1.1a: Automate News Event Extraction with Dual Crawlers and LLM-Based Extraction
+#### Story 1.1a: Automate News Event Extraction with Dual Crawlers and LLM-Based Extraction **[POSTPONED - 2025-01-06]**
+
+**⏸️ STATUS:** This story is **POSTPONED** based on 2025-01-06 meeting decision (see `docs/references/20250106.md`).
+
+**Rationale:** System will initially focus on **DART disclosure financial metrics extraction** (Story 1.1c) instead of news-based event extraction with sentiment analysis. News-based event extraction will be implemented in a future phase.
+
+**Current Focus:** See Story 1.1c for DART metrics extraction implementation.
+
+---
+
+**Original Story (for future reference):**
 
 **As a** user
 **I want** the system to automatically extract events from news articles using dual crawlers and LLM-based extraction
@@ -633,18 +643,29 @@ Users see rich visualizations of event patterns and historical matches; system a
 - Rate limiting: Max 5 requests/sec to respect DART API limits
 - Deduplication by rcept_no (receipt number) to prevent duplicates
 
-**Event Extraction (Post-collection):**
-- Extract financial events from structured DART data using LLM (FR2, FR2a)
-- Extract sentiment score (-1 to 1 range) for each DART event (FR2)
-- Assign source attribute "DART" to all extracted events (FR2b)
-- For dates with no events extracted, standardize sentiment score to 0 (FR2c)
-- Classify events into 6 major DART categories matching the collection categories (FR2d)
-- Extract event context from structured fields: amount, market cap ratio, purpose, timing (FR2e)
+**Event Extraction (Post-collection):** **[UPDATED - 2025-01-06]**
+
+**Current Approach (Metrics-Based):**
+- **See Story 1.1c** for DART financial metrics extraction (16 disclosure types)
+- Extract financial metrics from structured DART data (FR2i-FR2z)
+- Calculate disclosure-specific metrics (조달비율, 희석률, CB발행비율, etc.)
+- Store metrics in `dart_disclosure_metrics` table with JSONB format
+- Metrics used for backtesting queries (not sentiment scores)
+
+**Original Approach (POSTPONED):**
+- ~~Extract financial events from structured DART data using LLM (FR2, FR2a)~~
+- ~~Extract sentiment score (-1 to 1 range) for each DART event (FR2)~~ **[POSTPONED - 2025-01-06]**
+- ~~Assign source attribute "DART" to all extracted events (FR2b)~~ **[POSTPONED - 2025-01-06]**
+- ~~For dates with no events extracted, standardize sentiment score to 0 (FR2c)~~ **[POSTPONED - 2025-01-06]**
+- Classify events into 6 major DART categories matching the collection categories (FR2d) - **Still applies to metrics**
+- Extract event context from structured fields: amount, market cap ratio, purpose, timing (FR2e) - **Still applies to metrics**
 - Reference implementation: `docs/references/DART(modified events).md` (민우 2026-01-03)
 
 **Database changes:**
 - **Local PostgreSQL**: 20 new tables (one per report type) with structured schemas
-- **Neo4j**: Add `sentiment` float property (-1 to 1) and `source` string property ("DART") to Event nodes
+- **Local PostgreSQL**: **[NEW - 2025-01-06]** Add `dart_disclosure_metrics` table (see Story 1.1c for schema)
+- **Neo4j**: ~~Add `sentiment` float property (-1 to 1)~~ **[POSTPONED - 2025-01-06]** (metrics-based approach instead)
+- **Neo4j**: Add `source` string property ("DART") to Event nodes
 - **Neo4j**: Add `event_context` JSON property with: {amount, market_cap_ratio, purpose, timing}
 - **Neo4j**: Document nodes linked to Event nodes via EXTRACTED_FROM relationship
 
