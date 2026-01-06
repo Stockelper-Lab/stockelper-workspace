@@ -18,6 +18,36 @@ date: '2025-12-12'
 
 _This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._
 
+## ⏸️ POSTPONED FEATURES (2025-01-06 Meeting)
+
+**Meeting Reference:** 2025-01-06 meeting (see `docs/references/20250106.md`)
+
+The following architectural components have been **POSTPONED** based on decisions made in the 2025-01-06 meeting:
+
+**News-Based Event Extraction Pipeline:**
+- Dual news crawlers (Naver mobile API + Toss RESTful API)
+- LLM-based event extraction from news articles
+- Sentiment scoring architecture (-1.0 to +1.0)
+- MongoDB storage for news collections (`naver_stock_news`, `toss_stock_news`)
+- News-related Airflow DAGs
+
+**Rationale:**
+System will initially focus on **DART disclosure financial metrics extraction** (see Repository 1b) instead of news-based sentiment analysis. This provides more quantitative, reliable data for backtesting.
+
+**Architectural Impact:**
+- Repository 1 sections describing news pipeline are **preserved for future reference** but marked as POSTPONED
+- New Repository 1b describes DART metrics extraction architecture
+- Backtesting service will query `dart_disclosure_metrics` table (not sentiment scores)
+
+**Current Focus:**
+- DART disclosure categories used directly as events
+- Financial metrics calculated per disclosure type (16 types)
+- Metrics stored in PostgreSQL for backtesting queries
+
+**These sections are preserved below for future implementation reference.**
+
+---
+
 ## Project Context Analysis
 
 ### Requirements Overview
@@ -26,7 +56,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 The system encompasses 103 functional requirements across 11 major domains:
 
-1. **Event Intelligence & Knowledge Graph (FR1-FR8):** Extract events from Korean news (Naver Finance) and DART disclosures, classify into defined ontology, store in Neo4j with date indexing, detect similar events across subgraphs
+1. **Event Intelligence & Knowledge Graph (FR1-FR8):** Extract events from DART disclosures (news-based extraction **[POSTPONED - 2025-01-06]**), classify into defined ontology, store in Neo4j with date indexing, detect similar events across subgraphs
 2. **Prediction & Analysis (FR9-FR18):** Multi-timeframe predictions (short/medium/long-term), confidence calculation, historical pattern matching, explanation generation
 3. **Portfolio Management (FR19-FR28):** Manual recommendation requests, event-based rationale, portfolio tracking, investment profile management
 4. **Backtesting & Validation (FR29-FR39):** User-initiated backtesting, multi-timeframe returns (3/6/12 months), Sharpe Ratio calculation, performance range analysis
@@ -35,7 +65,7 @@ The system encompasses 103 functional requirements across 11 major domains:
 7. **Ontology Management (FR57-FR68):** Development team CRUD operations for event categories, extraction rule configuration, accuracy metrics, validation workflow
 8. **Compliance & Audit (FR69-FR80):** Embedded disclaimers, comprehensive prediction logging (12-month retention), audit trail for accountability
 9. **User Account & Authentication (FR81-FR90):** JWT-based authentication, secure session management, data isolation per user
-10. **Data Pipeline & Orchestration (FR91-FR97):** Airflow DAG for News Crawler → Event Extraction → Knowledge Graph → Prediction Engine
+10. **Data Pipeline & Orchestration (FR91-FR97):** Airflow DAG for DART Collection → Event Extraction → Knowledge Graph (News Crawler **[POSTPONED - 2025-01-06]**)
 11. **Rate Limiting & Abuse Prevention (FR98-FR103):** Query throttling, anomaly detection, alert frequency caps
 
 **Non-Functional Requirements:**
@@ -46,7 +76,7 @@ Critical NFRs that will drive architectural decisions:
 - **Security (NFR-S1 to S16):** AES-256 encryption at rest, TLS 1.2+ in transit, bcrypt password hashing, JWT 24-hour expiration, SQL injection & XSS prevention, 12-month audit logs
 - **Reliability (NFR-R1 to R13):** 99% uptime target, daily backups with 30-day retention, transactional knowledge graph updates, exponential backoff retries, 4-hour RTO
 - **Scalability (NFR-SC1 to SC9):** 10x user growth support, 10,000+ events/month, 1M+ news articles, 3x traffic spike handling during market events
-- **Integration (NFR-I1 to I9):** Tolerate 1-hour API downtime (DART/KIS/Naver), 30s timeouts, hourly news refresh, 5-minute stock price updates
+- **Integration (NFR-I1 to I9):** Tolerate 1-hour API downtime (DART/KIS), 30s timeouts, 5-minute stock price updates (Naver news refresh **[POSTPONED - 2025-01-06]**)
 - **Maintainability (NFR-M1 to M9):** 70% test coverage goal, zero-downtime ontology deployments, structured logs, accuracy metrics dashboards
 - **Usability (NFR-U1 to U6):** Korean language support, actionable error messages, 2-minute time-to-first-prediction for new users
 
@@ -62,7 +92,7 @@ Critical NFRs that will drive architectural decisions:
   - Fintech compliance requirements
 - **Estimated architectural components:**
   - 3 major new subsystems (Event Extraction Engine, Prediction Engine, Alert System)
-  - 5 existing services to extend (Frontend, Airflow, LLM, KG Builder, News Crawler)
+  - 5 existing services to extend (Frontend, Airflow, LLM, KG Builder, DART Collection in News Crawler - **[News crawling POSTPONED - 2025-01-06]**)
   - 2 new services (Backtesting Service, Portfolio Service - containerized)
   - Supabase Realtime for real-time notifications (no custom notification service needed)
   - 10+ integration points across services
@@ -104,13 +134,13 @@ The production build and runtime assumptions are updated based on recent meeting
 - **Data Pipeline:** Apache Airflow 2.10 orchestration already established
 - **LLM Service:** FastAPI + LangGraph multi-agent system operational
 - **Knowledge Graph:** Neo4j 5.11+ with existing entity relationships
-- **News Crawler:** Python-based scraper for Naver Finance
-- **Databases:** PostgreSQL (users/auth), MongoDB (raw news), Neo4j (knowledge graph)
+- **DART Collection Service:** **[POSTPONED - 2025-01-06]** Python-based scraper (Naver Finance news crawling postponed, DART collection remains active)
+- **Databases:** PostgreSQL (users/auth, DART data), MongoDB (raw news **[POSTPONED - 2025-01-06]**), Neo4j (knowledge graph)
 
 **External Dependencies:**
 - **DART API:** Financial disclosure data (official Korean source)
 - **KIS OpenAPI:** Korean trading data and real-time market information
-- **Naver Finance:** News article source for event extraction
+- **Naver Finance:** **[POSTPONED - 2025-01-06]** News article source for event extraction (postponed)
 - **OpenAI API:** LLM inference for chat interface and event classification (gpt-5.1)
 - **Supabase Realtime:** Real-time database change notifications for frontend updates
 
@@ -200,18 +230,18 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
   - Implementation must follow official LangChain v1.0+ documentation
 - **Data Pipeline:** Apache Airflow 2.10 for orchestration
 - **Knowledge Graph Builder:** Python 3.12 CLI for Neo4j management
-- **News Crawler:** Python 3.11+ with Typer CLI framework
+- **DART Collection:** **[POSTPONED - 2025-01-06]** Python 3.11+ with Typer CLI framework (news crawling postponed, DART collection active)
 
 **Data Layer:**
-- **PostgreSQL:** User accounts, authentication, LLM checkpoints
-- **MongoDB:** Scraped news articles, raw financial data
+- **PostgreSQL:** User accounts, authentication, LLM checkpoints, DART disclosures, disclosure metrics
+- **MongoDB:** **[POSTPONED - 2025-01-06]** Scraped news articles (postponed)
 - **Neo4j 5.11+:** Knowledge graph entities and relationships
 
 **External Integrations:**
 - **DART API:** Korean financial disclosures (checked **once daily**)
 - **KIS OpenAPI:** Korean trading data and real-time market information
-- **Naver Securities News:** News scraping (periodic per stock every **2-3 hours**)
-- **Toss Securities News:** News scraping (periodic per stock every **2-3 hours**)
+- **Naver Securities News:** **[POSTPONED - 2025-01-06]** News scraping (postponed)
+- **Toss Securities News:** **[POSTPONED - 2025-01-06]** News scraping (postponed)
 - **OpenAI API:** LLM inference for chat interface and event classification
 
 ### Dual Event Pipeline Architecture
@@ -223,7 +253,7 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
 - **Workflow:**
   1. Daily check for new disclosure information using 20 major report type APIs
   2. When new disclosure detected → Extract structured data per report type
-  3. Event extraction with sentiment scoring
+  3. **[UPDATED - 2025-01-06]** Extract financial metrics from disclosures (see FR2i-FR2z, metrics-based approach replaces sentiment scoring)
   4. Add events to Neo4j knowledge graph
   5. Compare new event with historical events (already in graph)
   6. Measure resulting stock price movement
@@ -267,9 +297,9 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
    - 20 tables (one per report type)
    - Structured schema per type
    ↓
-5. Event Extraction + Sentiment Scoring
-   - LLM-based classification (gpt-5.1)
-   - Sentiment range: -1.0 to 1.0
+5. **[UPDATED - 2025-01-06]** Financial Metrics Extraction (not sentiment)
+   - Calculate disclosure-specific metrics (see FR2i-FR2z)
+   - 16 disclosure types with formulas (증자조달비율, CB발행비율, etc.)
    - 6 DART event categories mapping
    ↓
 6. Neo4j Storage
@@ -284,8 +314,7 @@ This is **not a greenfield project** requiring a starter template. Stockelper ha
 
 **Local PostgreSQL:**
 - DART disclosure raw data (20 report type tables)
-- Event extraction results
-- Sentiment scores
+- **[UPDATED - 2025-01-06]** DART disclosure metrics (16 disclosure types, see FR2i-FR2z) in `dart_disclosure_metrics` table
 - Daily stock price data (for backtesting)
 
 **Remote PostgreSQL (`${POSTGRES_HOST}`):**
@@ -447,7 +476,13 @@ Tasks:
 
 ---
 
-**Pipeline 2: News-Based Events**
+**Pipeline 2: News-Based Events** **[POSTPONED - 2025-01-06]**
+
+**⏸️ STATUS:** This pipeline is **POSTPONED** based on 2025-01-06 meeting decision (see `docs/references/20250106.md`).
+
+**Rationale:** System will initially focus on DART disclosure financial metrics extraction instead of news-based event extraction with sentiment analysis.
+
+**Original Plan (for future reference):**
 - **Frequency:** Every 2-3 hours per specific stock
 - **Sources:** Naver Securities News + Toss Securities News
 - **Workflow:**
@@ -488,7 +523,7 @@ All new functionality integrates into existing services following established pa
 
 **3. Event Notifications (New Feature):**
 - **Requirement:** Real-time alerts when similar events occur
-- **Trigger:** New disclosure event or news event matches historical patterns
+- **Trigger:** New disclosure event matches historical patterns (news event matching **[POSTPONED - 2025-01-06]**)
 - **Implementation Approach:** Leverage existing notification patterns
 - **Integration:** Event monitoring system triggers notifications after pattern matching
 - **Pattern to Follow:** Existing push notification infrastructure (if available) or establish pattern consistent with current architecture
@@ -497,7 +532,8 @@ All new functionality integrates into existing services following established pa
 - **Guideline:** New DAGs must follow existing style and conventions
 - **New DAGs Required:**
   - Daily DART disclosure check (once per day)
-  - Periodic news crawling (every 2-3 hours per stock)
+  - **[UPDATED - 2025-01-06]** DART financial metrics extraction DAG (after disclosure collection)
+  - **[POSTPONED - 2025-01-06]** Periodic news crawling (postponed)
   - Portfolio recommendation scheduling (9:00 AM daily)
   - Event pattern matching and notification triggers
 - **Requirement:** Review existing DAG structure before implementing new pipelines
@@ -510,14 +546,14 @@ All new functionality integrates into existing services following established pa
 - **New Endpoints:** Event queries, backtesting requests, recommendation retrieval
 
 **6. Database Schema Evolution:**
-- **PostgreSQL:** Reuse existing schemas for user data, add alert preferences
-- **MongoDB:** Reuse existing schemas for news/financial data
+- **PostgreSQL:** Reuse existing schemas for user data, add alert preferences, **[UPDATED - 2025-01-06]** add `dart_disclosure_metrics` table for financial metrics
+- **MongoDB:** **[POSTPONED - 2025-01-06]** News/financial data schemas (postponed)
 - **Neo4j:**
   - Reuse existing entity and relationship schemas where possible
   - **New schemas required:**
     - Date-indexed events (for temporal pattern matching)
     - Subgraph pattern structures
-    - Event metadata (source, disclosure vs news, deduplication markers)
+    - Event metadata (source: DART disclosure, **[POSTPONED]** deduplication markers for news)
     - Historical price movements linked to events
   - Ensure backward compatibility with existing graph queries
 
@@ -2663,11 +2699,13 @@ stockelper-kg/
 
 ---
 
-#### **Repository 4: News Crawler (Python CLI)**
+#### **Repository 4: News Crawler (Python CLI)** **[POSTPONED - 2025-01-06]**
+
+**⏸️ STATUS:** This repository's news crawling functionality is POSTPONED. See "POSTPONED FEATURES" section at document start.
 
 **Repository:** `stockelper-crawler/`
 
-**Purpose:** Web scraping for news articles (Naver, Toss Securities) and DART disclosures, with deduplication and MongoDB storage.
+**Purpose:** **[POSTPONED]** Web scraping for news articles (Naver, Toss Securities) and DART disclosures, with deduplication and MongoDB storage. **Note:** DART collection remains active, news crawling (Naver + Toss) postponed.
 
 **Technology Stack:** Python 3.11+, BeautifulSoup4, requests, Typer CLI, PyMongo
 
@@ -3604,14 +3642,22 @@ CREATE INDEX idx_backtest_status ON backtest_results(status)
 - **Data Retrieved:** Closing prices, volume, technical indicators (EPS, PER, PBR)
 - **Storage:** PostgreSQL `daily_stock_prices` table
 
-**3. Naver Finance (News Articles)**
+**3. Naver Finance (News Articles)** **[POSTPONED - 2025-01-06]**
+
+**⏸️ STATUS:** News crawling from Naver Finance is **POSTPONED** (see `docs/references/20250106.md`).
+
+**Original Plan (for future reference):**
 - **Service:** `stockelper-crawler/src/crawlers/naver_securities_crawler.py`
 - **Frequency:** Every 3 hours via `dag_news_crawling.py`
 - **Target Stocks:** AI-related sector (pilot scope)
 - **Storage:** MongoDB `news_articles` collection
 - **Deduplication:** Hybrid embedding (before storage)
 
-**4. Toss Securities (News Articles)**
+**4. Toss Securities (News Articles)** **[POSTPONED - 2025-01-06]**
+
+**⏸️ STATUS:** News crawling from Toss Securities is **POSTPONED** (see `docs/references/20250106.md`).
+
+**Original Plan (for future reference):**
 - **Service:** `stockelper-crawler/src/crawlers/toss_securities_crawler.py`
 - **Frequency:** Every 3 hours via `dag_news_crawling.py`
 - **Target Stocks:** AI-related sector (pilot scope)
@@ -3622,44 +3668,48 @@ CREATE INDEX idx_backtest_status ON backtest_results(status)
 - **Service:** `stockelper-llm/src/services/event_extraction/`, `stockelper-llm/src/multi_agent/`
 - **Usage:**
   - Event classification (32 types)
-  - Sentiment analysis (-1.0 to 1.0)
+  - **[UPDATED - 2025-01-06]** Financial metrics extraction from DART disclosures (not sentiment analysis from news)
   - Chat interface (conversational AI)
 - **Models:** GPT-4 or GPT-3.5-turbo (configurable in `.env`)
 - **Rate Limiting:** OpenAI tier limits respected
 
-#### Complete Data Flow Example
+#### Complete Data Flow Example **[POSTPONED - 2025-01-06]**
 
-**End-to-End: New Event → User Notification**
+**⏸️ STATUS:** This news-based data flow example is **POSTPONED** (see `docs/references/20250106.md`).
+
+**Rationale:** System will use DART disclosure metrics extraction instead of news-based event extraction.
+
+**Original Plan: End-to-End: New Event → User Notification (for future reference)**
 
 ```
-Step 1: News Collection (Every 3 hours)
+Step 1: News Collection (Every 3 hours) [POSTPONED]
   ├─ Airflow triggers dag_news_crawling
   ├─ Task: crawl_naver_securities_news (stockelper-crawler)
   ├─ Task: crawl_toss_securities_news (stockelper-crawler)
   ├─ Output: XCom push news_articles
   └─ Next: store_raw_news_mongodb
 
-Step 2: Store Raw News
+Step 2: Store Raw News [POSTPONED]
   ├─ Task: store_raw_news_mongodb
   ├─ MongoDB collection: news_articles
   ├─ Fields: news_id, title, content, source, published_date
   └─ Next: trigger_deduplication
 
-Step 3: Deduplication
+Step 3: Deduplication [POSTPONED]
   ├─ Task: trigger_deduplication
   ├─ Service: stockelper-llm/src/services/event_extraction/deduplicator.py
   ├─ Algorithm: Hybrid (0.6×dense + 0.4×sparse embedding)
   ├─ Threshold: 0.85+ = duplicate
   └─ Next: trigger_event_extraction
 
-Step 4: Event Extraction
+Step 4: Event Extraction [POSTPONED]
   ├─ Task: trigger_event_extraction
   ├─ Service: stockelper-llm/src/services/event_extraction/extractor.py
   ├─ LLM: OpenAI API (event classification + sentiment)
   ├─ Output: Events with sentiment_score, event_type
   └─ Next: Store in MongoDB event_metadata
 
-Step 5: Graph Ingestion
+Step 5: Graph Ingestion [POSTPONED]
   ├─ Service: stockelper-kg/src/ingestion/news_ingestion.py
   ├─ Read: MongoDB event_metadata
   ├─ Write: Neo4j :Event nodes
