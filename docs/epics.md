@@ -663,6 +663,109 @@ Users see rich visualizations of event patterns and historical matches; system a
 
 ---
 
+#### Story 1.1c: DART Financial Metrics Extraction and Storage **[NEW - 2025-01-06]**
+
+**As a** backtesting system
+**I want** to extract financial metrics from DART disclosures
+**So that** I can use these metrics for event-based backtesting
+
+**Meeting Reference:** 2025-01-06 meeting decision (see `docs/references/20250106.md`)
+
+**Acceptance Criteria:**
+
+**Given** DART disclosure data collected in PostgreSQL (20 types)
+**When** the metrics extraction pipeline executes
+**Then** the following conditions are met:
+
+**Metric Extraction (16 Disclosure Types for Backtesting):**
+- System identifies disclosure type from API response (disclosure_type_code: 6-9, 16-17, 21-26, 29-30, 33-36) (FR2i)
+- System extracts required fields per disclosure type from structured API data (FR2j)
+- System calculates metrics using formulas from meeting notes (FR2j)
+  - Example: 유상증자_조달비율 = (fdpp_fclt + fdpp_op + fdpp_dtrp + fdpp_ocsa + fdpp_etc) / 시가총액
+  - Example: 유상증자_희석률 = nstk_ostk_cnt / bfic_tisstk_ostk
+- System stores metrics in PostgreSQL `dart_disclosure_metrics` table (FR2k)
+- Metrics stored as JSONB with metric names as keys (FR2k-4)
+- Market cap calculated or retrieved for ratio calculations (FR2k-6)
+- Deduplication by rcept_no (UNIQUE constraint on rcept_no column) (FR2k-1)
+
+**Supported Metrics by Category (16 Disclosure Types):**
+1. **증자/감자 (Types 6, 7, 8, 9):** 조달비율, 희석률, 배정비율, 감자비율 (FR2i-1a to FR2i-1d)
+2. **전환사채/BW (Types 16, 17):** CB_발행비율, 전환희석률, BW_발행비율, BW_희석률 (FR2i-2a to FR2i-2d)
+3. **자기주식 (Types 21-24):** 취득금액비율, 처분금액비율, 신탁계약비율, 신탁해지비율 (FR2i-3a to FR2i-3d)
+4. **영업양수도 (Types 25-26):** 양수가액비율, 양도가액비율, 자산비중 (FR2i-4a to FR2i-4c)
+5. **타법인주식 (Types 29-30):** 금액비율, 총자산대비, 자기자본대비 (FR2i-5a to FR2i-5c)
+6. **합병/분할 (Types 33-36):** 합병비율, 분할비율, 교환이전비율 (FR2i-6a to FR2i-6c)
+
+**Metric Calculation Logic:**
+- Each disclosure type has dedicated calculator module in `/stockelper-kg/src/stockelper_kg/calculators/`
+- Calculator modules extract required fields from DART API response
+- Calculator applies formulas using extracted fields and market cap data
+- Calculation failures (missing fields, divide-by-zero) logged and stored as null in JSONB
+- Validation checks for outliers (e.g., ratios > 1.0 for percentage metrics)
+
+**Airflow DAG (dag_dart_metrics_extraction.py):**
+- **Schedule:** Daily execution after `dag_dart_collection` completes (triggered by upstream DAG success)
+- **Frequency:** Once per day (processes newly collected disclosures from past 24 hours)
+- **Tasks:**
+  1. `identify_new_disclosures` - Query PostgreSQL for new DART disclosures (by rcept_dt and created_at)
+  2. `calculate_metrics` - Apply formulas per disclosure type (16 types, parallel execution per type)
+  3. `store_metrics` - INSERT INTO `dart_disclosure_metrics` table (UPSERT if rcept_no exists)
+  4. `validate_metrics` - Check for null values, outliers, calculation errors
+- **Error Handling:** Retry failed calculations up to 3 times with exponential backoff
+- **Monitoring:** Log success/failure counts per disclosure type for observability
+
+**Database Schema (FR2k):**
+- **Table:** `dart_disclosure_metrics`
+- **Columns:**
+  - `id` SERIAL PRIMARY KEY
+  - `rcept_no` VARCHAR(20) NOT NULL UNIQUE (receipt number, UNIQUE for deduplication)
+  - `corp_code` VARCHAR(8) NOT NULL (8-digit company code)
+  - `stock_code` VARCHAR(6) NOT NULL (6-digit stock code)
+  - `disclosure_type` VARCHAR(50) NOT NULL (Korean name, e.g., "유상증자결정")
+  - `disclosure_type_code` INT NOT NULL (numeric code: 6-9, 16-17, 21-26, 29-30, 33-36)
+  - `metrics` JSONB NOT NULL (calculated metrics as key-value pairs)
+  - `market_cap` DECIMAL(20,2) (market capitalization at disclosure date)
+  - `rcept_dt` DATE NOT NULL (disclosure receipt date)
+  - `created_at` TIMESTAMP DEFAULT NOW()
+  - `updated_at` TIMESTAMP DEFAULT NOW()
+- **Indexes:**
+  - `idx_metrics_stock_date` on (stock_code, rcept_dt DESC) for date-range queries
+  - `idx_metrics_type` on (disclosure_type_code) for filtering by disclosure type
+  - `idx_metrics_rcept` on (rcept_no) for unique lookup
+
+**JSONB Metrics Structure Examples:**
+- Type 6 (유상증자): `{"유상증자_조달비율": 0.15, "유상증자_희석률": 0.05}`
+- Type 16 (전환사채): `{"CB_발행비율": 0.10, "전환희석률": 0.03}`
+- Type 21 (자기주식취득): `{"취득금액비율": 0.02}`
+- Type 33 (합병): `{"합병비율": 0.25}`
+
+**Backtesting Integration (FR2l, FR2m):**
+- Backtesting service queries `dart_disclosure_metrics` table with WHERE clause on metrics JSONB
+- User can specify metric-based conditions (e.g., `metrics->>'유상증자_조달비율'::float > 0.1`)
+- System filters stocks matching conditions and calculates returns following disclosure date
+
+**Files Affected:**
+- `/stockelper-kg/src/stockelper_kg/extractors/dart_metrics_extractor.py` (NEW - main extraction orchestrator)
+- `/stockelper-kg/src/stockelper_kg/calculators/__init__.py` (NEW)
+- `/stockelper-kg/src/stockelper_kg/calculators/capital_changes.py` (NEW - Types 6-9 calculator)
+- `/stockelper-kg/src/stockelper_kg/calculators/convertible_bonds.py` (NEW - Types 16-17 calculator)
+- `/stockelper-kg/src/stockelper_kg/calculators/treasury_stock.py` (NEW - Types 21-24 calculator)
+- `/stockelper-kg/src/stockelper_kg/calculators/business_transfer.py` (NEW - Types 25-26 calculator)
+- `/stockelper-kg/src/stockelper_kg/calculators/other_company_stocks.py` (NEW - Types 29-30 calculator)
+- `/stockelper-kg/src/stockelper_kg/calculators/ma_restructuring.py` (NEW - Types 33-36 calculator)
+- `/stockelper-kg/src/stockelper_kg/models/disclosure_metrics.py` (NEW - SQLAlchemy model)
+- `/stockelper-kg/migrations/004_create_dart_metrics_table.sql` (NEW - table schema)
+- `/stockelper-airflow/dags/dart_metrics_extraction_dag.py` (NEW - daily extraction DAG)
+- `/stockelper-kg/tests/test_metrics_calculators.py` (NEW - unit tests for metric formulas)
+
+**Implementation Reference:**
+- Complete architecture: `docs/architecture.md` Lines 2401-2521 (Repository 1b)
+- PRD requirements: `docs/prd.md` FR2i-FR2z (Lines 1175-1268)
+- Meeting notes: `docs/references/20250106.md` for metric formulas and context
+- Database schema: See Repository 1b in Architecture document for complete SQL DDL
+
+---
+
 #### Story 1.2: Frontend Event Timeline Visualization
 
 **As a** user
