@@ -2398,6 +2398,128 @@ stockelper-frontend/
 
 ---
 
+#### **Repository 1b: DART Financial Metrics Extraction (Python CLI)** **[NEW - 2025-01-06]**
+
+**Repository:** `stockelper-kg/` (metrics extraction module)
+
+**Purpose:** Extract and calculate disclosure-specific financial metrics from DART disclosures for backtesting queries.
+
+**Meeting Reference:** 2025-01-06 meeting decision (see `docs/references/20250106.md`)
+
+**Architecture:**
+- **Input:** DART API data (20 disclosure types, focus on 16 for backtesting)
+- **Processing:** Metric calculation engine per disclosure type
+- **Output:** PostgreSQL table `dart_disclosure_metrics` with calculated metrics
+
+**Metric Calculation Engine:**
+
+**1. 증자/감자 (Capital Changes) - Types 6, 7, 8, 9:**
+- 유상증자_조달비율 = (fdpp_fclt + fdpp_op + fdpp_dtrp + fdpp_ocsa + fdpp_etc) / 시가총액
+- 유상증자_희석률 = nstk_ostk_cnt / bfic_tisstk_ostk
+- 무상증자_배정비율 = nstk_ascnt_ps_ostk (direct from API)
+- 감자_비율 = dcrs_rt (direct from API)
+
+**2. 전환사채/BW (Convertible Bonds) - Types 16, 17:**
+- CB_발행비율 = bd_tm_iem / 시가총액
+- 전환희석률 = nstk_estm_ostk / bfic_tisstk_ostk
+- BW_발행비율 = bd_tm_iem / 시가총액
+- BW_희석률 = nstk_estm_ostk / bfic_tisstk_ostk
+
+**3. 자기주식 (Treasury Stock) - Types 21-24:**
+- 취득금액비율 = acqs_m_am_estm / 시가총액
+- 처분금액비율 = disp_m_am / 시가총액
+- 신탁계약비율 = trst_m_cntr_pyam / 시가총액
+- 신탁해지비율 = trst_cntr_tm / 시가총액
+
+**4. 영업양수도 (Business Transfer) - Types 25-26:**
+- 양수가액비율 = acqs_am / 시가총액
+- 양도가액비율 = disp_am / 시가총액
+- 자산비중 = acqs_am / 자산총계 (or disp_am / 자산총계)
+
+**5. 타법인주식 (Other Company Stocks) - Types 29-30:**
+- 금액비율 = acqs_am / 시가총액 (or disp_am / 시가총액)
+- 총자산대비 = acqs_am / 자산총계 (or disp_am / 자산총계)
+- 자기자본대비 = acqs_am / 자기자본 (or disp_am / 자기자본)
+
+**6. 합병/분할 (M&A/Restructuring) - Types 33-36:**
+- 합병비율 = mg_tm / 시가총액
+- 분할비율 = dvd_rt (from API) or dvd_tm / 시가총액
+- 교환이전비율 = excg_tm / 시가총액 (or trf_tm / 시가총액)
+
+**Database Schema:**
+
+```sql
+CREATE TABLE dart_disclosure_metrics (
+    id SERIAL PRIMARY KEY,
+    rcept_no VARCHAR(20) NOT NULL UNIQUE,  -- Receipt number (UNIQUE constraint for deduplication)
+    corp_code VARCHAR(8) NOT NULL,         -- 8-digit company code
+    stock_code VARCHAR(6) NOT NULL,        -- 6-digit stock code
+    disclosure_type VARCHAR(50) NOT NULL,  -- e.g., "유상증자결정"
+    disclosure_type_code INT NOT NULL,     -- 6, 7, 8, 9, 16, 17, 21-26, 29-30, 33-36
+    metrics JSONB NOT NULL,                -- {"유상증자_조달비율": 0.15, "희석률": 0.05}
+    market_cap DECIMAL(20,2),              -- Market capitalization at disclosure date
+    rcept_dt DATE NOT NULL,                -- Disclosure receipt date
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+
+    -- Indexes for efficient querying
+    INDEX idx_metrics_stock_date (stock_code, rcept_dt DESC),
+    INDEX idx_metrics_type (disclosure_type_code),
+    INDEX idx_metrics_rcept (rcept_no)
+);
+
+-- Example JSONB structure for metrics column:
+-- Type 6 (유상증자): {"유상증자_조달비율": 0.15, "유상증자_희석률": 0.05}
+-- Type 16 (전환사채): {"CB_발행비율": 0.10, "전환희석률": 0.03}
+-- Type 21 (자기주식취득): {"취득금액비율": 0.02}
+```
+
+**Implementation Details:**
+
+**Airflow DAG:** `dag_dart_metrics_extraction.py`
+- **Trigger:** After `dag_dart_collection` completes (daily 8:00 AM KST)
+- **Frequency:** Daily (processes newly collected disclosures)
+- **Tasks:**
+  1. `identify_new_disclosures` - Query PostgreSQL for new DART disclosures
+  2. `calculate_metrics` - Apply formulas per disclosure type
+  3. `store_metrics` - Insert/update `dart_disclosure_metrics` table
+  4. `validate_metrics` - Check for null values, outliers, calculation errors
+
+**Backtesting Integration:**
+- Backtesting service queries `dart_disclosure_metrics` table
+- User can specify metric-based conditions (e.g., "유상증자_조달비율 > 0.1")
+- System filters stocks matching conditions and calculates returns
+
+**Repository Structure:**
+```
+stockelper-kg/
+├── src/
+│   └── stockelper_kg/
+│       ├── extractors/
+│       │   └── dart_metrics_extractor.py         # Main extraction logic (NEW)
+│       ├── calculators/                           # (NEW directory)
+│       │   ├── __init__.py
+│       │   ├── capital_changes.py                 # 증자/감자 metrics (Types 6-9)
+│       │   ├── convertible_bonds.py               # 전환사채/BW (Types 16-17)
+│       │   ├── treasury_stock.py                  # 자기주식 (Types 21-24)
+│       │   ├── business_transfer.py               # 영업양수도 (Types 25-26)
+│       │   ├── other_company_stocks.py            # 타법인주식 (Types 29-30)
+│       │   └── ma_restructuring.py                # 합병/분할 (Types 33-36)
+│       └── models/
+│           └── disclosure_metrics.py              # SQLAlchemy model (NEW)
+├── migrations/
+│   └── 004_create_dart_metrics_table.sql          # (NEW)
+└── tests/
+    └── test_metrics_calculators.py                # Unit tests for metric formulas (NEW)
+```
+
+**See Also:**
+- PRD FR2i-FR2z for functional requirements
+- `docs/references/20250106.md` for meeting context and metric formulas
+- Story 1.1c (Epic 1) for implementation acceptance criteria
+
+---
+
 #### **Repository 2: LLM Service (FastAPI + LangGraph)**
 
 **Repository:** `stockelper-llm/`
