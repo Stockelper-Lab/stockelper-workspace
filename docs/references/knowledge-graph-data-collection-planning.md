@@ -3,7 +3,7 @@
 | 클래스 | 설명 | 분리 이유 | 예시 |
 | --- | --- | --- | --- |
 | Company | 모든 그래프의 중심이 되는 기업 단위 엔티티 | corp_code 기반으로 고유 식별 가능 | 삼성전자, BYD |
-| Event | 기업의 사건(공시, 뉴스) | 시점, 영향, 참여 주체가 구분되는 행위 단위 | 합병, 증설, 규제 |
+| Event | 기업의 사건(공시 카테고리 기반 이벤트; 뉴스 기반 이벤트 추출은 추후) | 시점, 영향, 참여 주체가 구분되는 행위 단위 | 유상증자_결정, 전환사채권_발행결정, 자기주식_취득_결정 |
 | Document | 원천 데이터(공시, 뉴스 기사) | 이벤트와 원천 자료를 분리하여 다대다 연결 | DART 2025-09A, 연합뉴스 2025-09-01 |
 | Person | 임원·대주주 등 실질 주체 | 시계열 관계(임기, 지분)는 엣지에서 표현 | 이재용, 정용진 |
 | Product | 사업보고서의 주요 제품 및 서비스 | 제품군 단위 분석 | DRAM, Galaxy S24 |
@@ -29,9 +29,12 @@
 | Company | 섹터 | std_idst_clsf_cd_name | KIS | kis.indicator(stock_code) |
 | Company | 자본금 | capital_stock | KIS / OpenDART 재무 | dart.finstate_map_accounts(dart.finstate(cc, 2024))["capital_stock"]["value"] |
 | Event | 사건ID | event_id | 내부 | f"EVT_{rcept_no}" |
-| Event | 유형(L1) | pblntf_ty | OpenDART list.json | row.get("pblntf_ty", "B") |
-| Event | 유형(L2) | pblntf_detail_ty | OpenDART list.json | row.get("pblntf_detail_ty", row.get("report_nm")) |
-| Event | 일자 | reported_at | OpenDART list.json | row["rcept_dt"] |
+| Event | 소스 | source | 내부 | "DART" (NEWS는 추후) |
+| Event | 공시 카테고리 | disclosure_category | PostgreSQL (dart_* major-report tables) | row["category"] |
+| Event | 공시 엔드포인트(유형) | report_type | PostgreSQL (dart_* major-report tables) | row["report_type"] |
+| Event | 공시 타입 코드(백테스팅 16종) | disclosure_type_code | 내부 매핑 | DART_MAJOR_REPORT_TYPE_CODE_MAP[report_type] |
+| Event | 공시명(한글) | disclosure_name | 내부 매핑 / OpenDART | DART_MAJOR_REPORT_NAME_MAP[report_type] |
+| Event | 접수일 | rcept_dt | PostgreSQL (dart_* major-report tables) | row["rcept_dt"] |
 | Document | 공시번호 | rcept_no | OpenDART list.json | dart.list_filings(cc,"2025-01-01","2025-12-31","B").iloc[0]["rcept_no"] |
 | Document | 제목 | report_nm | OpenDART list.json | df.iloc[0]["report_nm"] |
 | Document | 게시일 | rcept_dt | OpenDART list.json | df.iloc[0]["rcept_dt"] |
@@ -106,7 +109,56 @@
 | OCCURRED_ON | Event → Date | 이벤트 발생일 연결 | 증설 → 2025-09-01 |
 | RECORDED_ON | StockPrice → Date | 시세 기록 날짜 | 주가 → 2025-09-01 |
 
-## Event Ontology
+## DART Disclosure Category Events (CURRENT - 2025-01-06)
+
+> **변경 요지:** 과거(뉴스/공시 원문) 기반의 LLM 이벤트 추출 대신, **공시정보의 “카테고리/유형(major-report endpoint)” 자체를 Event로 사용**합니다.  
+> (뉴스 기반 이벤트 추출/감성지수는 **POSTPONED**)
+
+### Backtesting 대상 공시 타입(코드/엔드포인트) 매핑
+
+| disclosure_type_code | report_type(endpoint) | disclosure_name | disclosure_category |
+| --- | --- | --- | --- |
+| 6 | piicDecsn | 유상증자_결정 | 증자감자 |
+| 7 | fricDecsn | 무상증자_결정 | 증자감자 |
+| 8 | pifricDecsn | 유무상증자_결정 | 증자감자 |
+| 9 | crDecsn | 감자_결정 | 증자감자 |
+| 16 | cvbdIsDecsn | 전환사채권_발행결정 | 사채발행 |
+| 17 | bdwtIsDecsn | 신주인수권부사채권_발행결정 | 사채발행 |
+| 21 | tsstkAqDecsn | 자기주식_취득_결정 | 자기주식 |
+| 22 | tsstkDpDecsn | 자기주식_처분_결정 | 자기주식 |
+| 23 | tsstkAqTrctrCnsDecsn | 자기주식취득_신탁계약_체결_결정 | 자기주식 |
+| 24 | tsstkAqTrctrCcDecsn | 자기주식취득_신탁계약_해지_결정 | 자기주식 |
+| 25 | bsnInhDecsn | 영업양수_결정 | 영업양수도 |
+| 26 | bsnTrfDecsn | 영업양도_결정 | 영업양수도 |
+| 29 | otcprStkInvscrInhDecsn | 타법인주식_양수결정 | 타법인주식 |
+| 30 | otcprStkInvscrTrfDecsn | 타법인주식_양도결정 | 타법인주식 |
+| 33 | cmpMgDecsn | 회사합병_결정 | 합병분할 |
+| 34 | cmpDvDecsn | 회사분할_결정 | 합병분할 |
+| 35 | cmpDvmgDecsn | 회사분할합병_결정 | 합병분할 |
+| 36 | stkExtrDecsn | 주식교환이전_결정 | 합병분할 |
+
+### Neo4j 적재 시 Event 노드 핵심 속성(권장)
+- `event_id`: `EVT_{rcept_no}`
+- `source`: `"DART"`
+- `disclosure_type_code`, `report_type`, `disclosure_name`, `disclosure_category`
+- (선택) `metrics_json` / `event_context_json`: PostgreSQL에서 계산/추출된 지표(JSON) 문자열
+
+### Airflow 기반 일일/리빌드 워크플로우(권장)
+- **DART 공시 수집(PostgreSQL 적재)**: `dart_disclosure_collection_curated_major_reports` (매일 08:00 KST)
+- **주가 수집(PostgreSQL 적재)**: `stock_price_to_db` (운영 스케줄에 따름)
+- **Neo4j KG 일일 적재**: `neo4j_kg_etl_dag` (매일 20:10 KST, 주가 수집 이후)
+- **Neo4j KG 리빌드(수동)**: `neo4j_kg_rebuild_dag` (Airflow Variables: `KG_REBUILD_START_DATE`, `KG_REBUILD_END_DATE`, `KG_REBUILD_WIPE`)
+
+### (권장) Neo4j 적재 결과 검증용 Cypher
+- 전체 라벨별 노드 수:
+  - `MATCH (n) RETURN labels(n) AS labels, count(*) AS cnt ORDER BY cnt DESC;`
+- 특정 날짜(예: 2026-01-06) 기준 시세 적재 확인:
+  - `MATCH (:Company)-[:HAS_STOCK_PRICE]->(:StockPrice)-[:RECORDED_ON]->(:PriceDate)-[:IS_DATE]->(d:Date {date: '2026-01-06'}) RETURN count(*) AS price_rows;`
+- 공시 카테고리 이벤트 적재 확인:
+  - `MATCH (e:Event {source: 'DART'}) RETURN count(e) AS dart_events;`
+  - `MATCH (e:Event {source: 'DART'}) RETURN e.disclosure_type_code AS code, count(*) AS cnt ORDER BY cnt DESC;`
+
+## Event Ontology (POSTPONED - NEWS)
 
 | Event Type | 설명 | 필수 슬롯 (Required) | 선택 슬롯 (Optional) | **기업 (사례)** | **뉴스 요약 및 링크** |
 | --- | --- | --- | --- | --- | --- |

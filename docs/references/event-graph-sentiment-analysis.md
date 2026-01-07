@@ -1,5 +1,9 @@
 ### PR
 
+> **[UPDATED - 2025-01-06]** 본 문서는 **뉴스/LLM 기반 이벤트 추출 + 감성 분석**(sentiment_score) 중심의 과거 설계/구현 기록입니다.  
+> 2025-01-06 회의 결정에 따라 해당 방식은 **POSTPONED** 되었고, 현재는 **공시정보의 카테고리(major-report endpoint/분류) 자체를 Event로 사용**합니다.  
+> 최신 온톨로지/적재 방식은 `docs/references/knowledge-graph-data-collection-planning.md`의 **“DART Disclosure Category Events (CURRENT - 2025-01-06)”** 섹션을 기준으로 합니다.
+
 https://github.com/Stockelper-Lab/stockelper-kg/compare/feat/refactoring-code?expand=1
 
 ## 온톨로지 구현
