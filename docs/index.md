@@ -1,15 +1,14 @@
 # Stockelper Project Documentation Index
 
-**Generated:** 2025-12-08
+**Last Updated:** 2026-01-07
 **Documentation Type:** Multi-part Brownfield Project
-**Scan Level:** Deep
 
 ---
 
 ## Project Overview
 
 - **Project Name:** Stockelper
-- **Type:** Multi-part workspace (5 services)
+- **Type:** Multi-part workspace (7 microservices)
 - **Primary Languages:** TypeScript (Frontend) + Python (Backend)
 - **Architecture:** Microservices with AI/ML capabilities
 - **Domain:** Korean Stock Market Analysis Platform
@@ -20,112 +19,106 @@
 
 ### Frontend (fe)
 - **Type:** Web Application
-- **Tech Stack:** Next.js 15.3, React 19, TypeScript 5.8
+- **Tech Stack:** Next.js 15.3, React 19, TypeScript 5.8, Tailwind CSS
 - **Database:** PostgreSQL (Prisma ORM)
+- **Port:** 80 (production)
 - **Root:** `sources/fe/`
 
 ### Data Pipeline (airflow)
-- **Type:** Data Engineering
+- **Type:** ETL Pipeline Orchestration
 - **Tech Stack:** Apache Airflow 2.10, Python
 - **Databases:** MongoDB, PostgreSQL, Neo4j
+- **Port:** 21003 (Web UI)
 - **Root:** `sources/airflow/`
 
 ### LLM Service (llm)
-- **Type:** AI Backend Service
+- **Type:** Multi-Agent AI Analysis Service
 - **Tech Stack:** FastAPI, LangGraph, Python 3.12+
 - **Databases:** PostgreSQL, MongoDB, Neo4j
+- **Port:** 21009 (API)
 - **Root:** `sources/llm/`
 
 ### Knowledge Graph (kg)
 - **Type:** Graph Database Builder
 - **Tech Stack:** Python 3.12, Neo4j, OpenAI
 - **Databases:** Neo4j, MongoDB
+- **Port:** 21004 (HTTP), 21005 (Bolt)
 - **Root:** `sources/kg/`
 
 ### News Crawler (news-crawler)
 - **Type:** Data Collection
-- **Tech Stack:** Python 3.11+, Typer CLI
+- **Tech Stack:** Python 3.11+, BeautifulSoup, requests
 - **Database:** MongoDB
 - **Root:** `sources/news-crawler/`
 
----
+### Portfolio Service (portfolio)
+- **Type:** Portfolio Recommendation & Trading
+- **Tech Stack:** FastAPI, LangGraph, Black-Litterman
+- **Databases:** PostgreSQL
+- **Port:** 21008 (API)
+- **Root:** `sources/portfolio/`
 
-## Generated Documentation
-
-### Core Documentation
-- [Project Overview](./project-overview.md) - Executive summary and architecture overview
-- [Source Tree Analysis](./source-tree-analysis.md) - Complete directory structure with annotations
-- [Integration Architecture](./integration-architecture.md) _(To be generated)_ - How services communicate
-- [Technology Stack Details](./technology-stack.md) _(To be generated)_ - Comprehensive tech analysis
-
-### Part-Specific Documentation
-
-#### Frontend (fe)
-- [Architecture - Frontend](./architecture-fe.md) _(To be generated)_
-- [API Routes - Frontend](./api-routes-fe.md) _(To be generated)_
-- [Component Inventory - Frontend](./component-inventory-fe.md) _(To be generated)_
-- [Data Models - Frontend](./data-models-fe.md) _(To be generated)_
-- [Development Guide - Frontend](./development-guide-fe.md) _(To be generated)_
-
-#### Data Pipeline (airflow)
-- [Architecture - Airflow](./architecture-airflow.md) _(To be generated)_
-- [DAGs Documentation](./dags-airflow.md) _(To be generated)_
-- [Data Models - Airflow](./data-models-airflow.md) _(To be generated)_
-- [Development Guide - Airflow](./development-guide-airflow.md) _(To be generated)_
-
-#### LLM Service (llm)
-- [Architecture - LLM](./architecture-llm.md) _(To be generated)_
-- [API Contracts - LLM](./api-contracts-llm.md) _(To be generated)_
-- [Agent System](./agent-system-llm.md) _(To be generated)_
-- [Data Models - LLM](./data-models-llm.md) _(To be generated)_
-- [Development Guide - LLM](./development-guide-llm.md) _(To be generated)_
-
-#### Knowledge Graph (kg)
-- [Architecture - KG](./architecture-kg.md) _(To be generated)_
-- [Graph Schema](./graph-schema-kg.md) _(To be generated)_
-- [Development Guide - KG](./development-guide-kg.md) _(To be generated)_
-
-#### News Crawler (news-crawler)
-- [Architecture - Crawler](./architecture-crawler.md) _(To be generated)_
-- [Development Guide - Crawler](./development-guide-crawler.md) _(To be generated)_
+### Backtesting Service (backtesting)
+- **Type:** Strategy Backtesting Engine
+- **Tech Stack:** FastAPI, Prophet, ARIMA
+- **Databases:** PostgreSQL
+- **Port:** 21007 (API)
+- **Root:** `sources/backtesting/`
 
 ---
 
-## Existing Documentation
+## Core Documentation
+
+### Project Planning & Design
+- [PRD (Product Requirements Document)](./prd.md) - Complete functional and non-functional requirements
+- [Architecture](./architecture.md) - System architecture, technology decisions, data flows
+- [Epics & Stories](./epics.md) - Implementation roadmap with detailed stories
+- [UX Design Specification](./ux-design-specification.md) - User experience design
+- [Project Context](./project_context.md) - AI agent context document
+
+### Technical Analysis
+- [Source Tree Analysis](./source-tree-analysis.md) - Directory structure overview
+- [Project Overview](./project-overview.md) - Executive summary
+- [DART Implementation Analysis](./DART-implementation-analysis.md) - DART disclosure integration
+- [DART Disclosure Ingestion](./dart-disclosure-ingestion.md) - Event extraction specification
+
+### Status & Reports
+- [Implementation Readiness Report](./implementation-readiness-report-2026-01-04.md) - Current readiness assessment
+- [Documentation Update Summary](./DOCUMENTATION-UPDATE-SUMMARY-2026-01-06.md) - Latest documentation status
+- [Test Design System](./test-design-system.md) - Testing strategy
+
+---
+
+## Service-Specific Documentation
 
 ### Frontend (fe)
 - [README](../sources/fe/README.md) - Frontend overview and setup
 
 ### Data Pipeline (airflow)
 - [README](../sources/airflow/README.md) - Airflow overview
-- [DEPLOYMENT](../sources/airflow/DEPLOYMENT.md) - Deployment guide
-- [SCRIPTS_UPDATE](../sources/airflow/SCRIPTS_UPDATE.md) - Scripts documentation
 - [Architecture](../sources/airflow/docs/ARCHITECTURE.md) - System architecture
 - [API Reference](../sources/airflow/docs/API_REFERENCE.md) - API documentation
 - [Quick Start](../sources/airflow/docs/QUICKSTART.md) - Getting started
 - [Development](../sources/airflow/docs/DEVELOPMENT.md) - Development guide
-- [Log Management](../sources/airflow/docs/LOG_MANAGEMENT.md) - Logging guide
-- [Logging Guide](../sources/airflow/docs/LOGGING_GUIDE.md) - Logging best practices
-- [Troubleshooting](../sources/airflow/docs/TROUBLESHOOTING.md) - Common issues
-- [Admin Setup](../sources/airflow/docs/ADMIN_USER_SETUP.md) - Admin configuration
-- [Docker Compose Changes](../sources/airflow/docs/DOCKER_COMPOSE_CHANGES.md) - Docker updates
 
 ### LLM Service (llm)
 - [README](../sources/llm/README.md) - LLM service overview
 - [AGENTS](../sources/llm/AGENTS.md) - AI agents documentation
-- [Pre-commit Guide](../sources/llm/pre-commit-guide.md) - Development practices
-- [API Architecture Analysis](../sources/llm/docs/API_Architecture_Analysis.md) - API design
-- [KIS OpenAPI](../sources/llm/docs/API_KIS-OpenAPI.md) - Korean trading API integration
 - [LangGraph Structure](../sources/llm/docs/Langgraph_Structure.md) - Multi-agent system
-- [Function Definition](../sources/llm/docs/Function_Definition.md) - Function specs
-- [Functional Specification](../sources/llm/docs/Functional_Specification.md) - Requirements
+- [KIS OpenAPI](../sources/llm/docs/API_KIS-OpenAPI.md) - Korean trading API integration
 
 ### Knowledge Graph (kg)
 - [README](../sources/kg/README.md) - Knowledge graph overview
 - [Streaming Mode](../sources/kg/docs/STREAMING_MODE.md) - Streaming capabilities
 
 ### News Crawler (news-crawler)
-- [README](../sources/news-crawler/README.md) - Crawler overview
+- [README](../sources/news-crawler/README.md) - Crawler overview (Naver + Toss)
+
+### Portfolio Service (portfolio)
+- [README](../sources/portfolio/README.md) - Portfolio service overview
+
+### Backtesting Service (backtesting)
+- [README](../sources/backtesting/README.md) - Backtesting service overview
 
 ---
 
@@ -133,59 +126,39 @@
 
 Domain and planning documents:
 
+- [References Directory](./references/) - Meeting notes and domain documentation
 - [DART Main Events](./references/DART(main events).md) - Korean financial disclosure system events
-- [DART Disclosure Ingestion Spec](./dart-disclosure-ingestion.md) - Bulk backfill + daily incremental ingestion, event extraction, sentiment scoring
-- [Knowledge Graph Data Collection Planning](./references/knowledge-graph-data-collection-planning.md) - Comprehensive KG strategy (62KB)
+- [Knowledge Graph Data Collection Planning](./references/knowledge-graph-data-collection-planning.md) - Comprehensive KG strategy
 - [Portfolio Recommendation & User Investment Preferences](./references/portfolio-rec-user-investment-pref.md) - Investment preference modeling
-- [2026-11-17 Planning Doc](./references/20261117.md) - Project planning document
-
----
-
-## Getting Started
-
-### For New Features (PRD Creation)
-1. Review [Project Overview](./project-overview.md) for system understanding
-2. Check [Source Tree Analysis](./source-tree-analysis.md) for code organization
-3. Reference relevant part documentation (see Existing Documentation above)
-4. Review [Reference Documentation](#reference-documentation) for domain context
-5. Use this index as primary context for AI-assisted PRD creation
-
-### For Development
-1. **Frontend:** See `sources/fe/README.md`
-2. **Airflow:** See `sources/airflow/docs/QUICKSTART.md`
-3. **LLM Service:** See `sources/llm/README.md`
-4. **Knowledge Graph:** See `sources/kg/README.md`
-5. **News Crawler:** See `sources/news-crawler/README.md`
-
-### For Architecture Understanding
-1. Start with [Project Overview](./project-overview.md)
-2. Review [Source Tree Analysis](./source-tree-analysis.md)
-3. Read part-specific architecture docs (Airflow, LLM have detailed docs)
-4. Check integration patterns in existing READMEs
 
 ---
 
 ## Key Integration Points
 
-1. **Frontend ↔ LLM Service**
-   - REST API calls for AI-powered stock analysis
+1. **Frontend <-> LLM Service**
+   - SSE streaming for real-time chat responses
    - User authentication and session management
 
-2. **LLM Service ↔ Knowledge Graph**
-   - Neo4j queries for entity relationships
-   - RAG (Retrieval-Augmented Generation) for context
+2. **Frontend <-> Portfolio/Backtesting Services**
+   - Async job submission and results polling
+   - Recommendation and backtest result display
 
-3. **Airflow ↔ All Services**
+3. **LLM Service <-> Knowledge Graph**
+   - Neo4j queries for entity relationships
+   - GraphQA tool for subgraph retrieval
+
+4. **Airflow -> All Services**
    - Orchestrates data collection and processing
    - Triggers knowledge graph updates
+   - Daily stock price and DART disclosure collection
 
-4. **News Crawler → MongoDB → Airflow**
-   - Financial news collection pipeline
-   - Data enrichment and storage
+5. **News Crawler -> MongoDB -> Airflow**
+   - Dual crawler pipeline (Naver + Toss)
+   - Data enrichment and event extraction
 
-5. **Shared Databases**
-   - PostgreSQL: User data, LLM checkpoints
-   - MongoDB: Scraped news, raw financial data
+6. **Shared Databases**
+   - PostgreSQL: User data, backtest results, portfolio recommendations
+   - MongoDB: News articles, stock reports, competitors
    - Neo4j: Knowledge graph entities and relationships
 
 ---
@@ -193,51 +166,44 @@ Domain and planning documents:
 ## Development Workflow
 
 ### Local Development
-1. **Frontend:** `cd sources/fe && npm run dev`
-2. **LLM Service:** Docker compose or local Python environment
-3. **Airflow:** `docker-compose up` in airflow directory
-4. **KG Builder:** CLI commands via `stockelper-kg`
-5. **News Crawler:** Python scripts
+1. **Frontend:** `cd sources/fe && pnpm dev`
+2. **LLM Service:** `cd sources/llm && uv run uvicorn src.main:app --port 21009`
+3. **Portfolio:** `cd sources/portfolio && uv run uvicorn src.main:app --port 21008`
+4. **Backtesting:** `cd sources/backtesting && uv run uvicorn src.main:app --port 21007`
+5. **Airflow:** `docker-compose up` in airflow directory
+6. **KG Builder:** `cd sources/kg && uv run stockelper-kg --streaming`
+7. **News Crawler:** `cd sources/news-crawler && uv run python -m naver_news_crawler`
+
+### Package Management
+- **Python Services:** `uv` (primary), `pip` fallback
+- **Frontend:** `pnpm`
 
 ### Testing
-- **Frontend:** TypeScript type checking
+- **Frontend:** TypeScript type checking, Jest
 - **Python Services:** pytest with coverage
-- **Integration:** Manual testing via Postman/curl
-
-### Deployment
-- All services containerized with Docker
-- See individual deployment guides in part-specific docs
+- **E2E:** Playwright
 
 ---
 
-## Documentation Status
+## Getting Started
 
-✅ **Project Overview:** Complete
-✅ **Source Tree Analysis:** Complete
-⚠️ **Part-Specific Architecture:** To be generated (see sections above)
-⚠️ **API Documentation:** Partial (exists for Airflow/LLM, needs generation for FE)
-⚠️ **Data Models:** To be generated
-⚠️ **Development Guides:** Partial (exists in READMEs, needs consolidation)
+### For New Features
+1. Review [PRD](./prd.md) for requirements context
+2. Check [Architecture](./architecture.md) for system design
+3. Review [Epics & Stories](./epics.md) for implementation roadmap
+4. Reference [Project Context](./project_context.md) for AI agent context
 
----
+### For Development
+1. Clone workspace repository
+2. See individual service READMEs for setup instructions
+3. Use `uv` for Python dependency management
+4. Use `pnpm` for frontend dependency management
 
-## Next Steps
-
-### For Brownfield PRD
-When creating a PRD for new features:
-1. Point PRD workflow to this index.md
-2. Specify which part(s) the feature affects
-3. Reference relevant existing documentation
-4. Include domain context from reference docs
-
-### For Full Documentation
-To generate remaining documentation marked as "_(To be generated)_":
-1. Run document-project workflow again
-2. Select option to generate incomplete documentation
-3. Choose which specific documents to create
+### For Architecture Understanding
+1. Start with [Project Overview](./project-overview.md)
+2. Review [Architecture](./architecture.md) for detailed design
+3. Check [Source Tree Analysis](./source-tree-analysis.md) for code organization
 
 ---
 
-**Last Updated:** 2025-12-08
-**Documentation Tool:** BMAD Method - Document Project Workflow
 **Maintained By:** Stockelper Team

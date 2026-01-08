@@ -2,7 +2,7 @@
 project_name: 'Stockelper'
 user_name: 'Oldman'
 date: '2025-12-18'
-last_updated: '2026-01-04'
+last_updated: '2026-01-07'
 sections_completed: ['implementation_priority', 'technology_stack', 'language_rules', 'architectural_decisions', 'service_boundaries', 'ux_patterns', 'common_pitfalls', 'data_schemas_updated']
 repositories: 7
 repository_list: ['stockelper-fe', 'stockelper-llm', 'stockelper-kg', 'stockelper-airflow', 'stockelper-news-crawler', 'stockelper-backtesting', 'stockelper-portfolio']
@@ -326,14 +326,14 @@ Both `backtest_results` and `portfolio_recommendations` tables share this struct
 - **Credentials:** MUST use environment variables / secrets (NEVER commit to repo)
 
 **Local PostgreSQL (NEW - FR127):**
-- **Purpose:** Stores DART disclosure data (36 major report types), event extraction results, sentiment scores, daily stock price data
-- **Tables:** 36 DART disclosure tables (dart_piicDecsn, dart_dfOcr, etc.) + daily_stock_prices + dart_events
+- **Purpose:** Stores DART disclosure data (20 major report types), event extraction results, sentiment scores, daily stock price data
+- **Tables:** 20 DART disclosure tables (dart_piicDecsn, dart_dfOcr, etc.) + daily_stock_prices + dart_events
 - **Location:** Local development machine or dedicated data collection server
 - **Connection:** `LOCAL_POSTGRES_CONN_STRING` environment variable
 
 **Storage Location Summary:**
 - **Remote PostgreSQL**: Backtesting results, portfolio recommendations, user data, notifications
-- **Local PostgreSQL**: DART disclosures (36 types), event extraction, sentiment scores, daily price data
+- **Local PostgreSQL**: DART disclosures (20 types), event extraction, sentiment scores, daily price data
 - **Neo4j**: Event nodes, Document nodes, entity relationships, pattern matching
 - **MongoDB**: News articles, competitor intelligence, raw crawled data
 
@@ -345,7 +345,7 @@ Both `backtest_results` and `portfolio_recommendations` tables share this struct
 - **stockelper-airflow:** ETL pipeline scheduling (Airflow)
 - **stockelper-neo4j:** Knowledge graph (event data, entity relationships)
 - **MongoDB (Compass):** Competitor intelligence, securities firm report summaries
-- **Local PostgreSQL:** DART disclosure data storage (36 tables)
+- **Local PostgreSQL:** DART disclosure data storage (20 tables)
 
 **AWS Servers:**
 - **stockelper-small (t3.small):** Application servers (LLM service)
@@ -385,8 +385,8 @@ Both `backtest_results` and `portfolio_recommendations` tables share this struct
 
 **Knowledge Graph Builder (stockelper-kg):**
 - Neo4j graph construction
-- DART disclosure collection using 36 major report type APIs (FR126, FR127)
-- Stores raw DART data in Local PostgreSQL (36 tables)
+- DART disclosure collection using 20 major report type APIs (FR126, FR127)
+- Stores raw DART data in Local PostgreSQL (20 tables)
 - Event extraction from structured DART data
 - Daily stock price data collection (FR131)
 - Entity relationship management
@@ -397,8 +397,8 @@ Both `backtest_results` and `portfolio_recommendations` tables share this struct
 - Data pipeline coordination
 
 **News Crawler (stockelper-news-crawler):**
-- News article collection from Naver Finance
-- Raw data storage in MongoDB
+- Dual news crawlers (Naver mobile API + Toss RESTful API)
+- Raw data storage in MongoDB (naver_stock_news, toss_stock_news collections)
 
 ---
 
